@@ -1,0 +1,7 @@
+[pre_model_sync]
+working_time.patches.migrate_old_working_times
+working_time.patches.link_timesheet_and_attendance_to_working_time  # 2023-08-14
+
+[post_model_sync]
+working_time.patches.billable_time_pct # 1
+execute:from working_time.install import make_custom_fields; make_custom_fields() # 2026-03-27
