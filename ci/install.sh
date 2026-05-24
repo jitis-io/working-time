@@ -6,6 +6,7 @@ RUNNER_USER=runner
 RUNNER_HOME=/home/runner
 MYSQL_HOST=mariadb
 MYSQL_PORT=3306
+WORKSPACE="${CI_PROJECT_DIR:-$PWD}"
 
 if ! id -u "$RUNNER_USER" >/dev/null 2>&1; then
 	sudo useradd -m -d "$RUNNER_HOME" -s /bin/bash "$RUNNER_USER"
@@ -15,13 +16,14 @@ sudo mkdir -p "$RUNNER_HOME"
 sudo chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 
 run_as_runner() {
-	sudo -H -u "$RUNNER_USER" env PATH="$PATH" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" bash -lc "$1"
+	sudo -H -u "$RUNNER_USER" env PATH="$PATH" CI_PROJECT_DIR="$WORKSPACE" bash -lc "$1"
 }
 
 cd "$RUNNER_HOME" || exit
 
 sudo apt-get update && sudo apt-get install -y cron redis-server libcups2-dev default-mysql-client
 
+python -m pip install --upgrade pip
 pip install frappe-bench
 
 if command -v corepack >/dev/null 2>&1; then
@@ -30,6 +32,10 @@ if command -v corepack >/dev/null 2>&1; then
 else
 	npm install -g yarn
 fi
+
+until mysqladmin ping --host "$MYSQL_HOST" --port "$MYSQL_PORT" -u root -proot --silent; do
+	sleep 2
+done
 
 run_as_runner "git clone https://github.com/frappe/frappe --branch version-16 --depth 1"
 run_as_runner "bench init --skip-assets --frappe-path ~/frappe --python $(which python) frappe-bench"
@@ -52,7 +58,7 @@ sed -i 's/redis_socketio:/# redis_socketio:/g' Procfile
 
 run_as_runner "cd ~/frappe-bench && bench get-app erpnext --branch version-16"
 run_as_runner "cd ~/frappe-bench && bench get-app hrms --branch version-16"
-run_as_runner "cd ~/frappe-bench && bench get-app working_time \"${GITHUB_WORKSPACE}\""
+run_as_runner "cd ~/frappe-bench && bench get-app working_time \"$WORKSPACE\""
 
 run_as_runner "cd ~/frappe-bench && bench start &> bench_start.log &"
 run_as_runner "cd ~/frappe-bench && bench new-site --db-host $MYSQL_HOST --db-root-password root --admin-password admin test_site --install-app erpnext"

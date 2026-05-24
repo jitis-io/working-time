@@ -21,6 +21,6 @@
 				"message": "chore(release): Bumped to Version ${nextRelease.version}\n\n${nextRelease.notes}"
 			}
 		],
-		"@saithodev/semantic-release-gitea"
+		"@semantic-release/gitlab"
 	]
 }
