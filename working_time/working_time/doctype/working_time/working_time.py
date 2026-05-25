@@ -224,8 +224,12 @@ class WorkingTime(Document):
 							"hours": data["hours"],
 							"from_time": self.date,
 							"billing_hours": data["billable_hours"],
-							"description": get_description(openproject_site, key, "; ".join(data["customer_notes"])),
-							"openproject_work_package_url": get_openproject_work_package_url(openproject_site, key),
+							"description": get_description(
+								openproject_site, key, "; ".join(data["customer_notes"])
+							),
+							"openproject_work_package_url": get_openproject_work_package_url(
+								openproject_site, key
+							),
 						}
 					],
 					"note": ",\n".join(data["internal_notes"]),

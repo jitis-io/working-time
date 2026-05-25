@@ -24,7 +24,7 @@ cache:
 
 lint:
   stage: lint
-  image: python:3.11-bookworm
+  image: python:3.14-trixie
   before_script:
     - apt-get update
     - apt-get install -y --no-install-recommends git
@@ -38,7 +38,7 @@ lint:
 
 server_tests:
   stage: test
-  image: python:3.12-bookworm
+  image: python:3.14-trixie
   services:
     - name: mariadb:11.8
       alias: mariadb
@@ -61,7 +61,7 @@ server_tests:
 
 release:
   stage: release
-  image: node:24-bookworm-slim
+  image: node:24-trixie-slim
   variables:
     GIT_DEPTH: "0"
   before_script:

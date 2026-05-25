@@ -4,7 +4,6 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-
 OBSOLETE_CUSTOM_FIELDS = {
 	"Project": [
 		"openproject_section",

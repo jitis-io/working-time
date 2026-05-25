@@ -36,7 +36,7 @@ def _parse_formattable(value: Any) -> str:
 def _parse_duration(value: str | float | int | None) -> float:
 	if value is None:
 		return 0.0
-	if isinstance(value, (int, float)):
+	if isinstance(value, int | float):
 		return float(value)
 
 	text = str(value).upper()
@@ -123,13 +123,8 @@ def validate_project_mapping_on_save(doc, method=None):
 		)
 
 
-
 def _project_identifier(project_payload: dict[str, Any], project_id: str) -> str:
-	return (
-		project_payload.get("identifier")
-		or project_payload.get("name")
-		or f"openproject-{project_id}"
-	)
+	return project_payload.get("identifier") or project_payload.get("name") or f"openproject-{project_id}"
 
 
 def _project_notes(project_payload: dict[str, Any], identifier: str) -> str:
@@ -187,7 +182,6 @@ def _project_customer(project_payload: dict[str, Any]) -> str | None:
 	return None
 
 
-
 def _new_project_doc(project_id: str, identifier: str, notes: str, customer_name: str | None = None):
 	site_name = _single_site_name()
 	return frappe.get_doc(
@@ -206,9 +200,7 @@ def _ensure_project(project_id: str, project_payload: dict[str, Any] | None = No
 	site_name = _single_site_name()
 	rows = _project_rows(project_id)
 	if len(rows) > 1:
-		frappe.throw(
-			_("OpenProject project {0} is mapped to multiple ERPNext Projects").format(project_id)
-		)
+		frappe.throw(_("OpenProject project {0} is mapped to multiple ERPNext Projects").format(project_id))
 
 	client = OpenProjectClient(site_name)
 	payload = project_payload or client.get(f"/projects/{project_id}")
@@ -250,7 +242,9 @@ def _ensure_project(project_id: str, project_payload: dict[str, Any] | None = No
 
 def _resolve_employee_from_time_entry(client: OpenProjectClient, time_entry: dict[str, Any]) -> str | None:
 	user = (time_entry.get("_embedded") or {}).get("user") or {}
-	user_id = _normalize_id(user.get("id")) or _extract_id(((time_entry.get("_links") or {}).get("user") or {}).get("href"))
+	user_id = _normalize_id(user.get("id")) or _extract_id(
+		((time_entry.get("_links") or {}).get("user") or {}).get("href")
+	)
 	if user_id and "mail" not in user and "email" not in user:
 		try:
 			user = client.get(f"/users/{user_id}") or user
@@ -265,9 +259,8 @@ def _resolve_employee_from_time_entry(client: OpenProjectClient, time_entry: dic
 	lookup_values = [value for value in lookup_values if value]
 
 	for lookup in lookup_values:
-		employee = (
-			frappe.db.get_value("Employee", {"company_email": lookup}, "name")
-			or frappe.db.get_value("Employee", {"personal_email": lookup}, "name")
+		employee = frappe.db.get_value("Employee", {"company_email": lookup}, "name") or frappe.db.get_value(
+			"Employee", {"personal_email": lookup}, "name"
 		)
 		if employee:
 			return employee
@@ -284,7 +277,9 @@ def _resolve_employee_from_time_entry(client: OpenProjectClient, time_entry: dic
 def _ensure_activity_type(activity_name: str | None) -> str:
 	activity = (activity_name or "").strip() or "Default"
 	if not frappe.db.exists("Activity Type", activity):
-		frappe.get_doc({"doctype": "Activity Type", "activity_type": activity}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Activity Type", "activity_type": activity}).insert(
+			ignore_permissions=True
+		)
 	return activity
 
 
@@ -365,7 +360,9 @@ def _time_entry_description(time_entry: dict[str, Any], work_package_id: str | N
 
 def _time_entry_row_values(site_name: str, time_entry: dict[str, Any]) -> dict[str, Any]:
 	project_payload = (time_entry.get("_embedded") or {}).get("project") or {}
-	project_id = _normalize_id(project_payload.get("id")) or _extract_id(((time_entry.get("_links") or {}).get("project") or {}).get("href"))
+	project_id = _normalize_id(project_payload.get("id")) or _extract_id(
+		((time_entry.get("_links") or {}).get("project") or {}).get("href")
+	)
 	if not project_id:
 		frappe.throw(_("Time entry {0} is missing its OpenProject project").format(time_entry.get("id")))
 
@@ -376,11 +373,12 @@ def _time_entry_row_values(site_name: str, time_entry: dict[str, Any]) -> dict[s
 		or _extract_id(((time_entry.get("_links") or {}).get("entity") or {}).get("href"))
 	)
 	spent_on = str(time_entry.get("spentOn") or "")
-	start_time = _parse_op_datetime(time_entry.get("startTime")) or (f"{spent_on} 00:00:00" if spent_on else None)
-	activity_title = (
-		((time_entry.get("_embedded") or {}).get("activity") or {}).get("name")
-		or ((time_entry.get("_links") or {}).get("activity") or {}).get("title")
+	start_time = _parse_op_datetime(time_entry.get("startTime")) or (
+		f"{spent_on} 00:00:00" if spent_on else None
 	)
+	activity_title = ((time_entry.get("_embedded") or {}).get("activity") or {}).get("name") or (
+		(time_entry.get("_links") or {}).get("activity") or {}
+	).get("title")
 	row_values = {
 		"project": project_name,
 		"hours": _parse_duration(time_entry.get("hours")),
@@ -473,13 +471,14 @@ def _upsert_time_entry(time_entry: dict[str, Any]) -> str:
 
 
 @frappe.whitelist()
-def sync_project_by_openproject_id(openproject_project_id: str, site_name: str | None = None) -> dict[str, Any]:
+def sync_project_by_openproject_id(
+	openproject_project_id: str, site_name: str | None = None
+) -> dict[str, Any]:
 	project_name = _ensure_project(str(openproject_project_id))
 	return {"created_or_updated": True, "project": project_name}
 
 
 @frappe.whitelist()
-
 def sync_work_package_from_openproject(work_package_id: str, site_name: str | None = None) -> dict[str, Any]:
 	site_name = _single_site_name()
 	client = OpenProjectClient(site_name)
@@ -492,7 +491,6 @@ def sync_work_package_from_openproject(work_package_id: str, site_name: str | No
 
 
 @frappe.whitelist()
-
 def sync_time_entry_from_openproject(time_entry_id: str, site_name: str | None = None) -> dict[str, Any]:
 	site_name = _single_site_name()
 	client = OpenProjectClient(site_name)

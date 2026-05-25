@@ -1,4 +1,3 @@
-
 frappe.ui.form.on("OpenProject Site", {
 	refresh(frm) {
 		if (frm.is_new()) {

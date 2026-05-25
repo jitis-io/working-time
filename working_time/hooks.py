@@ -266,4 +266,3 @@ working_time_custom_fields = {
 		}
 	],
 }
-
