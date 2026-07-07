@@ -734,7 +734,18 @@ def _verify_webhook_signature(site_name: str, body: bytes) -> None:
 
 def _payload_id(payload: dict[str, Any], key: str) -> str | None:
 	value = payload.get(key) or {}
-	return _normalize_id(value.get("id"))
+	if isinstance(value, dict):
+		value_id = _normalize_id(value.get("id"))
+		if value_id:
+			return value_id
+
+	links = payload.get("_links") or {}
+	camel_key = key.split("_")[0] + "".join(part.capitalize() for part in key.split("_")[1:])
+	link = links.get(key) or links.get(camel_key)
+	if isinstance(link, dict):
+		return _extract_id(link.get("href"))
+
+	return None
 
 
 def _enqueue_webhook_action(site_name: str, payload: dict[str, Any]) -> dict[str, Any]:

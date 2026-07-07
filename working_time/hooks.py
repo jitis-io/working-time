@@ -100,7 +100,7 @@ doc_events = {
 	},
 	"Task": {
 		"validate": "working_time.openproject_sync.validate_task_mapping_on_save",
-	}
+	},
 }
 
 # Scheduled Tasks

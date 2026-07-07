@@ -29,12 +29,12 @@ def _bootstrap_frappe_stub() -> None:
 _bootstrap_frappe_stub()
 
 from working_time.openproject_sync import (
-	_parse_duration,
 	_enqueue_webhook_action,
+	_parse_duration,
+	_project_customer,
 	_row_changes,
 	_task_status,
 	_time_entry_reconcile_params,
-	_project_customer,
 )
 
 
@@ -149,8 +149,23 @@ class TestOpenProjectSync(unittest.TestCase):
 		enqueue.assert_called_once_with("OpenProject", "42")
 		self.assertEqual(result, {"queued": True, "action": "time_entry:updated", "time_entry_id": "42"})
 
+	def test_webhook_dispatch_enqueues_time_entry_from_hal_link(self):
+		with patch("working_time.openproject_sync.enqueue_sync_time_entry") as enqueue:
+			result = _enqueue_webhook_action(
+				"OpenProject",
+				{
+					"action": "time_entry:updated",
+					"_links": {"timeEntry": {"href": "/api/v3/time_entries/42"}},
+				},
+			)
+
+		enqueue.assert_called_once_with("OpenProject", "42")
+		self.assertEqual(result, {"queued": True, "action": "time_entry:updated", "time_entry_id": "42"})
+
 	def test_webhook_dispatch_deletes_work_package(self):
-		with patch("working_time.openproject_sync._delete_work_package", return_value={"deleted": True}) as delete:
+		with patch(
+			"working_time.openproject_sync._delete_work_package", return_value={"deleted": True}
+		) as delete:
 			result = _enqueue_webhook_action(
 				"OpenProject",
 				{"action": "work_package:deleted", "work_package": {"id": 99}},
