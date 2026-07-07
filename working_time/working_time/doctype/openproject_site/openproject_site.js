@@ -4,15 +4,15 @@ frappe.ui.form.on("OpenProject Site", {
 			return;
 		}
 
-		frm.add_custom_button(__("Sync Time Entries"), async () => {
+		frm.add_custom_button(__("Reconcile Time Entries"), async () => {
 			const { message } = await frappe.call({
-				method: "working_time.openproject_sync.poll_openproject_time_entries",
+				method: "working_time.openproject_sync.reconcile_openproject_time_entries",
 				freeze: true,
-				freeze_message: __("Syncing OpenProject time entries..."),
+				freeze_message: __("Reconciling OpenProject time entries..."),
 			});
 
 			frappe.msgprint({
-				title: __("OpenProject Sync Finished"),
+				title: __("OpenProject Reconciliation Finished"),
 				message: __(
 					"Created: {0}<br>Updated: {1}<br>Unchanged: {2}<br>Locked: {3}<br>Skipped: {4}",
 					[

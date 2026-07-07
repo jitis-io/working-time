@@ -11,7 +11,10 @@
   "column_break_2",
   "username",
   "column_break_4",
-  "api_token"
+  "api_token",
+  "webhook_secret",
+  "sync_section",
+  "time_entries_synced_until"
  ],
  "fields": [
   {
@@ -41,8 +44,25 @@
    "reqd": 1
   },
   {
+   "description": "Optional. Must match the Signature secret configured on the OpenProject webhook.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
+  },
+  {
    "fieldname": "column_break_4",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sync_section",
+   "fieldtype": "Section Break",
+   "label": "Sync"
+  },
+  {
+   "fieldname": "time_entries_synced_until",
+   "fieldtype": "Datetime",
+   "label": "Time Entries Synced Until",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

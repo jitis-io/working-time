@@ -29,9 +29,7 @@ app_license = "-"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {
-	"Timesheet": "public/js/timesheet.js",
-}
+# doctype_js = {"doctype": "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -99,6 +97,9 @@ after_migrate = "working_time.install.after_migrate"
 doc_events = {
 	"Project": {
 		"validate": "working_time.openproject_sync.validate_project_mapping_on_save",
+	},
+	"Task": {
+		"validate": "working_time.openproject_sync.validate_task_mapping_on_save",
 	}
 }
 
@@ -109,9 +110,11 @@ scheduler_events = {
 	# 	"all": [
 	# 		"working_time.tasks.all"
 	# 	],
-	"hourly": [
-		"working_time.openproject_sync.poll_openproject_time_entries",
-	],
+	"cron": {
+		"0 2 * * *": [
+			"working_time.openproject_sync.reconcile_openproject_time_entries",
+		],
+	},
 	"daily": [
 		"working_time.reminders.send_stale_reminders",
 		"working_time.reminders.send_month_end_reminders",
@@ -232,6 +235,26 @@ working_time_custom_fields = {
 			"translatable": 0,
 			"hidden": 1,
 			"description": "OpenProject numeric project ID for traceability.",
+		},
+	],
+	"Task": [
+		{
+			"fieldname": "openproject_url",
+			"label": "OpenProject URL",
+			"fieldtype": "Data",
+			"options": "URL",
+			"insert_after": "description",
+			"read_only": 1,
+			"translatable": 0,
+		},
+		{
+			"fieldname": "openproject_work_package_id",
+			"label": "OpenProject Work Package ID",
+			"fieldtype": "Data",
+			"insert_after": "openproject_url",
+			"translatable": 0,
+			"hidden": 1,
+			"description": "OpenProject numeric work package ID for traceability.",
 		},
 	],
 	"Timesheet": [
