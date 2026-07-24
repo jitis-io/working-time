@@ -1,7 +1,10 @@
 frappe.ui.form.on("OpenProject Webhook Event", {
 	refresh(frm) {
-		if (frm.doc.status !== "Failed" || !frappe.user.has_role("System Manager")) {
-			return
+		if (
+			frm.doc.status !== "Failed" ||
+			!frappe.user.has_role("System Manager")
+		) {
+			return;
 		}
 
 		frm.add_custom_button(__("Retry"), async () => {
@@ -10,8 +13,8 @@ frappe.ui.form.on("OpenProject Webhook Event", {
 				args: { event_name: frm.doc.name },
 				freeze: true,
 				freeze_message: __("Queueing retry…"),
-			})
-			frm.reload_doc()
-		})
+			});
+			frm.reload_doc();
+		});
 	},
-})
+});

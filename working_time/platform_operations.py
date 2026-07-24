@@ -8,7 +8,6 @@ import frappe
 import requests
 from frappe import _
 
-from .keycloak_client import KeycloakAdminClient, customer_group_name
 from .openproject_client import OpenProjectClient
 
 SYNC_QUEUE = "long"
@@ -29,10 +28,6 @@ def _json(value: Any) -> str:
 
 def _settings():
 	return frappe.get_single("Platform Operations Settings")
-
-
-def _get_password(doc: Any, fieldname: str) -> str:
-	return doc.get_password(fieldname) or ""
 
 
 def _append_step(doc: Any, step: str, status: str, detail: str = "") -> None:
@@ -341,7 +336,7 @@ def send_platform_alert(
 		alert.flags.ignore_permissions = True
 		alert.insert(ignore_permissions=True)
 		return alert.name
-	webhook_url = _get_password(settings, "teams_webhook_url")
+	webhook_url = (settings.teams_webhook_url or "").strip()
 	if not webhook_url:
 		alert.status = "Recorded"
 		alert.flags.ignore_permissions = True
@@ -365,35 +360,23 @@ def send_platform_alert(
 
 
 @frappe.whitelist()
-def record_backup_heartbeat(source: str, status: str = "success", detail: str = "") -> dict[str, str]:
+def send_test_teams_alert() -> dict[str, str]:
 	_only_system_manager()
-	severity = "Info" if status == "success" else "Error"
-	name = send_platform_alert(
-		"backup-heartbeat",
-		severity,
-		f"{source}: {detail or status}",
-		dedupe_key=f"backup-heartbeat:{source}:{status}",
-	)
-	return {"name": name, "status": status}
-
-
-def check_backup_heartbeats() -> None:
 	settings = _settings()
-	max_age = max(int(settings.backup_max_age_hours or 30), 1)
-	latest = frappe.get_all(
-		"Platform Alert",
-		filters={"source": "backup-heartbeat", "severity": "Info"},
-		fields=["creation", "message"],
-		order_by="creation desc",
-		limit_page_length=1,
+	if not (settings.teams_webhook_url or "").strip():
+		frappe.throw(_("Enter and save a Teams webhook URL first."))
+	name = send_platform_alert(
+		"teams-configuration-test",
+		"Info",
+		"ERPNext successfully sent this test alert.",
+		dedupe_key=f"teams-configuration-test:{_now().isoformat()}",
 	)
-	if not latest or (_now() - latest[0].creation).total_seconds() > max_age * 3600:
-		send_platform_alert(
-			"backup-heartbeat-missing",
-			"Critical",
-			f"No successful backup heartbeat has been recorded within {max_age} hours.",
-			dedupe_key="backup-heartbeat-missing",
+	alert = frappe.get_doc("Platform Alert", name)
+	if alert.status != "Sent":
+		frappe.throw(
+			_("Teams test alert failed: {0}").format(alert.error or _("No successful response was received."))
 		)
+	return {"name": name, "status": alert.status}
 
 
 def _sales_order_project_name(sales_order: Any) -> str:
@@ -407,14 +390,12 @@ def _openproject_site_name() -> str:
 	return sites[0]
 
 
-def _provisioning_preview(sales_order: Any, group_name: str) -> dict[str, Any]:
+def _provisioning_preview(sales_order: Any) -> dict[str, Any]:
 	return {
 		"sales_order": sales_order.name,
 		"customer": sales_order.customer,
 		"erpnext_project": _sales_order_project_name(sales_order),
 		"openproject_project_identifier": f"so-{sales_order.name}".lower(),
-		"keycloak_group": group_name,
-		"portal_role": _settings().keycloak_portal_role or "portal-customer",
 	}
 
 
@@ -428,8 +409,6 @@ def prepare_customer_project_provisioning(sales_order_name: str) -> dict[str, An
 	if existing:
 		doc = frappe.get_doc("Customer Project Provisioning", existing)
 		return {"name": doc.name, "preview": json.loads(doc.preview_json or "{}"), "status": doc.status}
-	settings = _settings()
-	group_name = customer_group_name(sales_order.customer, settings.keycloak_group_prefix)
 	doc = frappe.get_doc(
 		{
 			"doctype": "Customer Project Provisioning",
@@ -437,9 +416,7 @@ def prepare_customer_project_provisioning(sales_order_name: str) -> dict[str, An
 			"customer": sales_order.customer,
 			"status": "Preview",
 			"openproject_site": _openproject_site_name(),
-			"keycloak_group_name": group_name,
-			"portal_role": settings.keycloak_portal_role or "portal-customer",
-			"preview_json": _json(_provisioning_preview(sales_order, group_name)),
+			"preview_json": _json(_provisioning_preview(sales_order)),
 		}
 	)
 	doc.insert(ignore_permissions=True)
@@ -529,12 +506,6 @@ def process_customer_project_provisioning(provisioning_name: str) -> dict[str, s
 		_append_step(doc, "OpenProject Project", "Completed", op_project["id"])
 		doc.save(ignore_permissions=True)
 
-		keycloak = KeycloakAdminClient()
-		group = keycloak.ensure_group(doc.keycloak_group_name)
-		role = keycloak.ensure_realm_role(doc.portal_role)
-		keycloak.assign_realm_role_to_group(group["id"], role)
-		doc.keycloak_group_id = group["id"]
-		_append_step(doc, "Keycloak Group and Portal Role", "Completed", group["id"])
 		doc.status = "Completed"
 		doc.completed_at = _now()
 		doc.error = ""
@@ -669,113 +640,6 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	review.result_json = _json({"sales_invoices": invoices})
 	review.save(ignore_permissions=True)
 	return {"name": review.name, "sales_invoices": invoices}
-
-
-@frappe.whitelist()
-def prepare_customer_offboarding(customer: str) -> dict[str, Any]:
-	_only_system_manager()
-	existing = frappe.db.get_value("Customer Offboarding", {"customer": customer}, "name")
-	if existing:
-		doc = frappe.get_doc("Customer Offboarding", existing)
-		return {"name": doc.name, "status": doc.status, "preview": json.loads(doc.preview_json or "{}")}
-	settings = _settings()
-	group_name = customer_group_name(customer, settings.keycloak_group_prefix)
-	preview = {
-		"customer": customer,
-		"keycloak_group": group_name,
-		"actions": [
-			"Remove customer group membership from portal users",
-			"Keep accounts and data",
-			"Create review checklist",
-		],
-	}
-	doc = frappe.get_doc(
-		{
-			"doctype": "Customer Offboarding",
-			"customer": customer,
-			"status": "Preview",
-			"keycloak_group_name": group_name,
-			"preview_json": _json(preview),
-		}
-	)
-	doc.insert(ignore_permissions=True)
-	frappe.db.set_value(
-		"Customer",
-		customer,
-		"customer_offboarding",
-		doc.name,
-		update_modified=False,
-	)
-	return {"name": doc.name, "status": doc.status, "preview": preview}
-
-
-@frappe.whitelist()
-def confirm_customer_offboarding(offboarding_name: str) -> dict[str, str]:
-	_only_system_manager()
-	doc = frappe.get_doc("Customer Offboarding", offboarding_name)
-	if doc.status not in {"Preview", "Failed"}:
-		frappe.throw(_("Only a preview or failed offboarding can be confirmed."))
-	doc.status = "Queued"
-	doc.error = ""
-	doc.save(ignore_permissions=True)
-	frappe.enqueue(
-		"working_time.platform_operations.process_customer_offboarding",
-		offboarding_name=doc.name,
-		queue=SYNC_QUEUE,
-		timeout=SYNC_TIMEOUT,
-		enqueue_after_commit=True,
-	)
-	return {"name": doc.name, "status": doc.status}
-
-
-def process_customer_offboarding(offboarding_name: str) -> dict[str, str]:
-	doc = frappe.get_doc("Customer Offboarding", offboarding_name)
-	doc.status = "Processing"
-	doc.save(ignore_permissions=True)
-	try:
-		keycloak = KeycloakAdminClient()
-		group = keycloak.find_group(doc.keycloak_group_name)
-		if not group:
-			frappe.throw(_("Keycloak customer group {0} does not exist.").format(doc.keycloak_group_name))
-		member_ids = [member["id"] for member in keycloak.group_members(group["id"])]
-		for user_id in member_ids:
-			keycloak.remove_user_from_group(user_id, group["id"])
-		doc.keycloak_group_id = group["id"]
-		doc.revoked_user_ids_json = _json(member_ids)
-		doc.status = "Completed"
-		doc.completed_at = _now()
-		doc.error = ""
-		doc.save(ignore_permissions=True)
-		return {"name": doc.name, "status": doc.status}
-	except Exception as exc:
-		doc.status = "Failed"
-		doc.error = str(exc)
-		doc.save(ignore_permissions=True)
-		send_platform_alert(
-			"customer-offboarding-failed",
-			"Error",
-			f"Offboarding for {doc.customer} failed: {exc}",
-			dedupe_key=f"customer-offboarding:{doc.customer}",
-			customer=doc.customer,
-		)
-		raise
-
-
-@frappe.whitelist()
-def reactivate_customer_offboarding(offboarding_name: str) -> dict[str, str]:
-	_only_system_manager()
-	doc = frappe.get_doc("Customer Offboarding", offboarding_name)
-	if doc.status != "Completed":
-		frappe.throw(_("Only a completed offboarding can be reactivated."))
-	keycloak = KeycloakAdminClient()
-	group = keycloak.find_group(doc.keycloak_group_name)
-	if not group:
-		frappe.throw(_("Keycloak customer group {0} does not exist.").format(doc.keycloak_group_name))
-	for user_id in json.loads(doc.revoked_user_ids_json or "[]"):
-		keycloak.add_user_to_group(user_id, group["id"])
-	doc.status = "Reactivated"
-	doc.save(ignore_permissions=True)
-	return {"name": doc.name, "status": doc.status}
 
 
 @frappe.whitelist()

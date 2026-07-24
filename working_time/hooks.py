@@ -31,11 +31,10 @@ app_license = "-"
 # include js in doctype views
 doctype_js = {
 	"Sales Order": "public/js/sales_order.js",
-	"Customer": "public/js/customer.js",
 	"OpenProject Webhook Event": "public/js/openproject_webhook_event.js",
 	"Customer Project Provisioning": "public/js/customer_project_provisioning.js",
-	"Customer Offboarding": "public/js/customer_offboarding.js",
 	"Billing Review": "public/js/billing_review.js",
+	"Platform Operations Settings": "public/js/platform_operations_settings.js",
 }
 
 doctype_list_js = {
@@ -135,7 +134,6 @@ scheduler_events = {
 	"daily": [
 		"working_time.reminders.send_stale_reminders",
 		"working_time.reminders.send_month_end_reminders",
-		"working_time.platform_operations.check_backup_heartbeats",
 	],
 	# 	"hourly": [
 	# 		"working_time.tasks.hourly"
@@ -321,17 +319,6 @@ working_time_custom_fields = {
 			"label": "Customer Project Provisioning",
 			"fieldtype": "Link",
 			"options": "Customer Project Provisioning",
-			"insert_after": "customer_name",
-			"read_only": 1,
-			"translatable": 0,
-		},
-	],
-	"Customer": [
-		{
-			"fieldname": "customer_offboarding",
-			"label": "Customer Offboarding",
-			"fieldtype": "Link",
-			"options": "Customer Offboarding",
 			"insert_after": "customer_name",
 			"read_only": 1,
 			"translatable": 0,

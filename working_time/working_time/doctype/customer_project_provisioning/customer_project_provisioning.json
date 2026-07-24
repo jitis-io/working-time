@@ -13,9 +13,6 @@
   "openproject_site",
   "openproject_project_id",
   "openproject_url",
-  "keycloak_group_id",
-  "keycloak_group_name",
-  "portal_role",
   "preview_json",
   "steps",
   "error",
@@ -74,24 +71,6 @@
    "fieldtype": "Data",
    "label": "OpenProject URL",
    "options": "URL",
-   "read_only": 1
-  },
-  {
-   "fieldname": "keycloak_group_id",
-   "fieldtype": "Data",
-   "label": "Keycloak Group ID",
-   "read_only": 1
-  },
-  {
-   "fieldname": "keycloak_group_name",
-   "fieldtype": "Data",
-   "label": "Keycloak Group",
-   "read_only": 1
-  },
-  {
-   "fieldname": "portal_role",
-   "fieldtype": "Data",
-   "label": "Portal Role",
    "read_only": 1
   },
   {

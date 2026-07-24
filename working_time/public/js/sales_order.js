@@ -1,7 +1,10 @@
 frappe.ui.form.on("Sales Order", {
 	refresh(frm) {
-		if (frm.doc.docstatus !== 1 || !frappe.user.has_role("System Manager")) {
-			return
+		if (
+			frm.doc.docstatus !== 1 ||
+			!frappe.user.has_role("System Manager")
+		) {
+			return;
 		}
 
 		frm.add_custom_button(__("Project provision"), async () => {
@@ -10,13 +13,13 @@ frappe.ui.form.on("Sales Order", {
 				args: { sales_order_name: frm.doc.name },
 				freeze: true,
 				freeze_message: __("Preparing project provisioning…"),
-			})
-			const result = preview.message
-			const details = JSON.stringify(result.preview || {}, null, 2)
+			});
+			const result = preview.message;
+			const details = JSON.stringify(result.preview || {}, null, 2);
 			frappe.confirm(
 				__(
-					"Provision ERPNext project, OpenProject project and Keycloak portal group for this Sales Order?<br><br><pre>{0}</pre>",
-					[frappe.utils.escape_html(details)],
+					"Provision the ERPNext and OpenProject projects for this Sales Order?<br><br><pre>{0}</pre>",
+					[frappe.utils.escape_html(details)]
 				),
 				async () => {
 					await frappe.call({
@@ -24,10 +27,14 @@ frappe.ui.form.on("Sales Order", {
 						args: { provisioning_name: result.name },
 						freeze: true,
 						freeze_message: __("Queueing provisioning…"),
-					})
-					frappe.set_route("Form", "Customer Project Provisioning", result.name)
-				},
-			)
-		})
+					});
+					frappe.set_route(
+						"Form",
+						"Customer Project Provisioning",
+						result.name
+					);
+				}
+			);
+		});
 	},
-})
+});

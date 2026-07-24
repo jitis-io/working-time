@@ -50,9 +50,11 @@ Want to add pretty time logs to your invoice? Check out our [print formats](http
 
 ## Platform Operations
 
-The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews, provisioning and offboarding. Configure Teams, Keycloak and the time-billing Item in Platform Operations Settings before enabling external actions. Billing creates drafts only; offboarding removes portal access but never deletes data.
+The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews and project provisioning. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Billing creates drafts only.
 
-Run Docker quality and clean-bench integration checks before committing; see AGENTS.md. Uptime Kuma deployment is in ops/uptime-kuma.
+Project provisioning creates or links an ERPNext Project and OpenProject Project after an explicit preview. Portal permissions remain owned by the portal instead of being inferred from Keycloak groups.
+
+Run Docker quality and clean-bench integration checks before committing; see AGENTS.md.
 
 ## License
 

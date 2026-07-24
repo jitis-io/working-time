@@ -1,6 +1,8 @@
+import json
 import sys
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -14,6 +16,7 @@ def _bootstrap_frappe_stub() -> None:
 	frappe = types.ModuleType("frappe")
 	frappe._ = lambda message: message
 	frappe.throw = throw
+	frappe.ValidationError = RuntimeError
 	frappe.only_for = lambda *args, **kwargs: None
 	frappe.RetryBackgroundJobError = type("RetryBackgroundJobError", (Exception,), {})
 	frappe.whitelist = lambda *args, **kwargs: lambda fn: fn
@@ -27,7 +30,8 @@ def _bootstrap_frappe_stub() -> None:
 
 _bootstrap_frappe_stub()
 
-from working_time.keycloak_client import customer_group_name
+import frappe
+
 from working_time.platform_operations import (
 	_dispatch_openproject_event,
 	_reconciliation_function,
@@ -36,12 +40,19 @@ from working_time.platform_operations import (
 
 
 class TestPlatformOperations(unittest.TestCase):
-	def test_customer_group_name_is_stable_and_safe(self):
-		self.assertEqual(
-			customer_group_name("K-2601002 / Müller GmbH", "customer-"),
-			"customer-k-2601002-m-ller-gmbh-a466b0ce",
+	def test_teams_webhook_is_long_text_not_password(self):
+		doctype_path = (
+			Path(__file__).parent
+			/ "working_time"
+			/ "doctype"
+			/ "platform_operations_settings"
+			/ "platform_operations_settings.json"
 		)
-		self.assertEqual(customer_group_name("Customer", ""), "customer-customer-0e85749a")
+		metadata = json.loads(doctype_path.read_text())
+		fields = {field["fieldname"]: field for field in metadata["fields"]}
+
+		self.assertEqual(fields["teams_webhook_url"]["fieldtype"], "Small Text")
+		self.assertNotIn("keycloak_client_secret", fields)
 
 	def test_dispatches_time_entry_update_to_existing_sync(self):
 		event = types.SimpleNamespace(
@@ -83,5 +94,5 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(function.__name__, "reconcile_openproject_time_entries")
 
 	def test_unknown_reconciliation_type_is_rejected(self):
-		with self.assertRaises(RuntimeError):
+		with self.assertRaises(frappe.ValidationError):
 			_reconciliation_function("Unknown")

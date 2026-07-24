@@ -8,14 +8,6 @@
   "teams_section",
   "teams_webhook_url",
   "alert_cooldown_minutes",
-  "backup_max_age_hours",
-  "keycloak_section",
-  "keycloak_base_url",
-  "keycloak_realm",
-  "keycloak_client_id",
-  "keycloak_client_secret",
-  "keycloak_group_prefix",
-  "keycloak_portal_role",
   "billing_section",
   "default_time_billing_item"
  ],
@@ -26,9 +18,9 @@
    "label": "Teams alerts"
   },
   {
-   "description": "Incoming webhook for actionable platform alerts. Leave empty to record alerts without sending them.",
+   "description": "Microsoft Teams Workflow webhook for actionable alerts. This value is sensitive. Leave empty to only record alerts in ERPNext.",
    "fieldname": "teams_webhook_url",
-   "fieldtype": "Password",
+   "fieldtype": "Small Text",
    "label": "Teams webhook URL"
   },
   {
@@ -37,52 +29,6 @@
    "fieldtype": "Int",
    "label": "Alert cooldown (minutes)",
    "reqd": 1
-  },
-  {
-   "default": "30",
-   "description": "A successful backup heartbeat older than this raises an alert.",
-   "fieldname": "backup_max_age_hours",
-   "fieldtype": "Int",
-   "label": "Maximum backup heartbeat age (hours)",
-   "reqd": 1
-  },
-  {
-   "fieldname": "keycloak_section",
-   "fieldtype": "Section Break",
-   "label": "Keycloak"
-  },
-  {
-   "fieldname": "keycloak_base_url",
-   "fieldtype": "Data",
-   "label": "Keycloak base URL",
-   "options": "URL"
-  },
-  {
-   "fieldname": "keycloak_realm",
-   "fieldtype": "Data",
-   "label": "Keycloak realm"
-  },
-  {
-   "fieldname": "keycloak_client_id",
-   "fieldtype": "Data",
-   "label": "Keycloak service client ID"
-  },
-  {
-   "fieldname": "keycloak_client_secret",
-   "fieldtype": "Password",
-   "label": "Keycloak service client secret"
-  },
-  {
-   "default": "customer-",
-   "fieldname": "keycloak_group_prefix",
-   "fieldtype": "Data",
-   "label": "Customer group prefix"
-  },
-  {
-   "default": "portal-customer",
-   "fieldname": "keycloak_portal_role",
-   "fieldtype": "Data",
-   "label": "Portal realm role"
   },
   {
    "fieldname": "billing_section",
