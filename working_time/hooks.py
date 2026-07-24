@@ -29,7 +29,18 @@ app_license = "-"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype": "public/js/doctype.js"}
+doctype_js = {
+	"Sales Order": "public/js/sales_order.js",
+	"Customer": "public/js/customer.js",
+	"OpenProject Webhook Event": "public/js/openproject_webhook_event.js",
+	"Customer Project Provisioning": "public/js/customer_project_provisioning.js",
+	"Customer Offboarding": "public/js/customer_offboarding.js",
+	"Billing Review": "public/js/billing_review.js",
+}
+
+doctype_list_js = {
+	"Billing Review": "public/js/billing_review_list.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -112,18 +123,19 @@ scheduler_events = {
 	# 	],
 	"cron": {
 		"0 2 * * *": [
-			"working_time.openproject_sync.reconcile_openproject_time_entries",
+			"working_time.platform_operations.queue_incremental_time_entry_reconciliation",
 		],
 		"30 2 * * *": [
-			"working_time.openproject_sync.reconcile_openproject_projects_and_work_packages",
+			"working_time.platform_operations.queue_project_and_work_package_reconciliation",
 		],
 		"0 3 * * *": [
-			"working_time.openproject_sync.reconcile_openproject_time_entry_deletions",
+			"working_time.platform_operations.queue_time_entry_deletion_reconciliation",
 		],
 	},
 	"daily": [
 		"working_time.reminders.send_stale_reminders",
 		"working_time.reminders.send_month_end_reminders",
+		"working_time.platform_operations.check_backup_heartbeats",
 	],
 	# 	"hourly": [
 	# 		"working_time.tasks.hourly"
@@ -217,6 +229,15 @@ working_time_custom_fields = {
 	],
 	"Project": [
 		{
+			"fieldname": "source_sales_order",
+			"label": "Source Sales Order",
+			"fieldtype": "Link",
+			"options": "Sales Order",
+			"insert_after": "customer",
+			"read_only": 1,
+			"translatable": 0,
+		},
+		{
 			"fieldname": "billing_rate",
 			"label": "Billing Rate per Hour",
 			"fieldtype": "Currency",
@@ -293,5 +314,27 @@ working_time_custom_fields = {
 			"options": "Working Time Policy",
 			"insert_after": "holiday_list",
 		}
+	],
+	"Sales Order": [
+		{
+			"fieldname": "customer_project_provisioning",
+			"label": "Customer Project Provisioning",
+			"fieldtype": "Link",
+			"options": "Customer Project Provisioning",
+			"insert_after": "customer_name",
+			"read_only": 1,
+			"translatable": 0,
+		},
+	],
+	"Customer": [
+		{
+			"fieldname": "customer_offboarding",
+			"label": "Customer Offboarding",
+			"fieldtype": "Link",
+			"options": "Customer Offboarding",
+			"insert_after": "customer_name",
+			"read_only": 1,
+			"translatable": 0,
+		},
 	],
 }

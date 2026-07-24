@@ -11,9 +11,16 @@
   "action",
   "object_type",
   "object_id",
+  "customer",
+  "project",
   "status",
+  "payload_json",
   "result_json",
-  "error"
+  "error",
+  "attempt_count",
+  "last_attempt_at",
+  "started_at",
+  "completed_at"
  ],
  "fields": [
   {
@@ -46,11 +53,32 @@
    "read_only": 1
   },
   {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Queued\nProcessed\nIgnored\nFailed",
+   "options": "Queued\nProcessing\nProcessed\nLocked\nIgnored\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payload_json",
+   "fieldtype": "Code",
+   "label": "Payload JSON",
+   "options": "JSON",
    "read_only": 1
   },
   {
@@ -64,6 +92,31 @@
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "attempt_count",
+   "fieldtype": "Int",
+   "label": "Attempt count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_attempt_at",
+   "fieldtype": "Datetime",
+   "label": "Last attempt at",
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started at",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed at",
    "read_only": 1
   }
  ],

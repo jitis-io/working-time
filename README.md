@@ -48,6 +48,12 @@ Companies that use OpenProject for project management and ERPNext for time track
 
 Want to add pretty time logs to your invoice? Check out our [print formats](https://github.com/alyf-de/erpnext_druckformate).
 
+## Platform Operations
+
+The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews, provisioning and offboarding. Configure Teams, Keycloak and the time-billing Item in Platform Operations Settings before enabling external actions. Billing creates drafts only; offboarding removes portal access but never deletes data.
+
+Run Docker quality and clean-bench integration checks before committing; see AGENTS.md. Uptime Kuma deployment is in ops/uptime-kuma.
+
 ## License
 
 ERPNext extension "Working Time": Timetracking and Attendance in ERPNext, integrated with OpenProject.

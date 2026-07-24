@@ -15,6 +15,8 @@
   "webhook_secret",
   "sync_section",
   "time_entries_synced_until",
+  "last_reconciliation_at",
+  "last_reconciliation_status",
   "enable_full_delete_reconciliation"
  ],
  "fields": [
@@ -63,6 +65,19 @@
    "fieldname": "time_entries_synced_until",
    "fieldtype": "Datetime",
    "label": "Time Entries Synced Until",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_reconciliation_at",
+   "fieldtype": "Datetime",
+   "label": "Last Reconciliation At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_reconciliation_status",
+   "fieldtype": "Select",
+   "label": "Last Reconciliation Status",
+   "options": "Processed\nFailed",
    "read_only": 1
   },
   {

@@ -1,0 +1,118 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "teams_section",
+  "teams_webhook_url",
+  "alert_cooldown_minutes",
+  "backup_max_age_hours",
+  "keycloak_section",
+  "keycloak_base_url",
+  "keycloak_realm",
+  "keycloak_client_id",
+  "keycloak_client_secret",
+  "keycloak_group_prefix",
+  "keycloak_portal_role",
+  "billing_section",
+  "default_time_billing_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "teams_section",
+   "fieldtype": "Section Break",
+   "label": "Teams alerts"
+  },
+  {
+   "description": "Incoming webhook for actionable platform alerts. Leave empty to record alerts without sending them.",
+   "fieldname": "teams_webhook_url",
+   "fieldtype": "Password",
+   "label": "Teams webhook URL"
+  },
+  {
+   "default": "60",
+   "fieldname": "alert_cooldown_minutes",
+   "fieldtype": "Int",
+   "label": "Alert cooldown (minutes)",
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "description": "A successful backup heartbeat older than this raises an alert.",
+   "fieldname": "backup_max_age_hours",
+   "fieldtype": "Int",
+   "label": "Maximum backup heartbeat age (hours)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "keycloak_section",
+   "fieldtype": "Section Break",
+   "label": "Keycloak"
+  },
+  {
+   "fieldname": "keycloak_base_url",
+   "fieldtype": "Data",
+   "label": "Keycloak base URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "keycloak_realm",
+   "fieldtype": "Data",
+   "label": "Keycloak realm"
+  },
+  {
+   "fieldname": "keycloak_client_id",
+   "fieldtype": "Data",
+   "label": "Keycloak service client ID"
+  },
+  {
+   "fieldname": "keycloak_client_secret",
+   "fieldtype": "Password",
+   "label": "Keycloak service client secret"
+  },
+  {
+   "default": "customer-",
+   "fieldname": "keycloak_group_prefix",
+   "fieldtype": "Data",
+   "label": "Customer group prefix"
+  },
+  {
+   "default": "portal-customer",
+   "fieldname": "keycloak_portal_role",
+   "fieldtype": "Data",
+   "label": "Portal realm role"
+  },
+  {
+   "fieldname": "billing_section",
+   "fieldtype": "Section Break",
+   "label": "Billing"
+  },
+  {
+   "description": "ERPNext Item used for hourly billing invoice drafts.",
+   "fieldname": "default_time_billing_item",
+   "fieldtype": "Link",
+   "label": "Default time billing item",
+   "options": "Item"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "module": "Working Time",
+ "name": "Platform Operations Settings",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ]
+}

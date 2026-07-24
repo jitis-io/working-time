@@ -24,7 +24,7 @@ def _bootstrap_frappe_stub() -> None:
 	frappe.get_all = lambda *args, **kwargs: []
 	frappe.get_doc = lambda *args, **kwargs: None
 	frappe.enqueue = lambda *args, **kwargs: None
-	frappe.whitelist = lambda *args, **kwargs: (lambda fn: fn)
+	frappe.whitelist = lambda *args, **kwargs: lambda fn: fn
 	sys.modules["frappe"] = frappe
 
 
@@ -175,31 +175,26 @@ class TestOpenProjectSync(unittest.TestCase):
 		self.assertTrue(parent.saved)
 
 	def test_webhook_dispatch_enqueues_time_entry_updates(self):
-		with patch("working_time.openproject_sync.enqueue_sync_time_entry") as enqueue:
-			result = _enqueue_webhook_action(
-				"OpenProject",
-				{"action": "time_entry:updated", "time_entry": {"id": 42}},
-			)
+		result = _enqueue_webhook_action(
+			"OpenProject",
+			{"action": "time_entry:updated", "time_entry": {"id": 42}},
+		)
 
-		enqueue.assert_called_once_with("OpenProject", "42")
 		self.assertEqual(result, {"queued": True, "action": "time_entry:updated", "time_entry_id": "42"})
 
 	def test_webhook_dispatch_enqueues_time_entry_from_hal_link(self):
-		with patch("working_time.openproject_sync.enqueue_sync_time_entry") as enqueue:
-			result = _enqueue_webhook_action(
-				"OpenProject",
-				{
-					"action": "time_entry:updated",
-					"_links": {"timeEntry": {"href": "/api/v3/time_entries/42"}},
-				},
-			)
+		result = _enqueue_webhook_action(
+			"OpenProject",
+			{
+				"action": "time_entry:updated",
+				"_links": {"timeEntry": {"href": "/api/v3/time_entries/42"}},
+			},
+		)
 
-		enqueue.assert_called_once_with("OpenProject", "42")
 		self.assertEqual(result, {"queued": True, "action": "time_entry:updated", "time_entry_id": "42"})
 
 	def test_webhook_dispatch_queues_work_package_delete(self):
 		with (
-			patch("working_time.openproject_sync.enqueue_delete_work_package") as enqueue,
 			patch("working_time.openproject_sync._remember_deleted_object") as remember,
 		):
 			result = _enqueue_webhook_action(
@@ -208,7 +203,6 @@ class TestOpenProjectSync(unittest.TestCase):
 			)
 
 		remember.assert_called_once_with("work_package", "99")
-		enqueue.assert_called_once_with("99")
 		self.assertEqual(
 			result,
 			{"queued": True, "action": "work_package:deleted", "work_package_id": "99"},
@@ -216,7 +210,6 @@ class TestOpenProjectSync(unittest.TestCase):
 
 	def test_webhook_dispatch_queues_time_entry_delete(self):
 		with (
-			patch("working_time.openproject_sync.enqueue_delete_time_entry") as enqueue,
 			patch("working_time.openproject_sync._remember_deleted_object") as remember,
 		):
 			result = _enqueue_webhook_action(
@@ -225,7 +218,6 @@ class TestOpenProjectSync(unittest.TestCase):
 			)
 
 		remember.assert_called_once_with("time_entry", "42")
-		enqueue.assert_called_once_with("42")
 		self.assertEqual(
 			result,
 			{"queued": True, "action": "time_entry:deleted", "time_entry_id": "42"},

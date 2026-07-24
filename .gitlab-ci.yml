@@ -1,77 +1,30 @@
 stages:
-  - lint
-  - test
-  - release
+  - quality
+  - integration
 
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "version-16"
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
 
 default:
   interruptible: true
 
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  MARIADB_ROOT_PASSWORD: root
-  NODE_ENV: production
-
-cache:
-  paths:
-    - .cache/pip
-
-lint:
-  stage: lint
-  image: python:3.14-trixie
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends git
-    - python -m pip install --upgrade pip
-    - pip install pre-commit
-  script:
-    - pre-commit run --all-files
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "version-16"
-
-server_tests:
-  stage: test
-  image: python:3.14-trixie
-  services:
-    - name: mariadb:11.8
-      alias: mariadb
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends sudo git cron redis-server libcups2-dev default-mysql-client nodejs npm
-    - python -m pip install --upgrade pip
-    - echo "127.0.0.1 test_site" >> /etc/hosts
-  script:
-    - bash ci/install.sh
-    - cd /home/runner/frappe-bench
-    - bench --site test_site set-config allow_tests true
-    - bench --site test_site run-tests --app working_time --skip-test-records
-  after_script:
-    - if [ -d /home/runner/frappe-bench ]; then cd /home/runner/frappe-bench && bench --site test_site uninstall-app --yes --no-backup working_time || true; fi
-    - cat /home/runner/frappe-bench/bench_start.log || true
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "version-16"
-
-release:
-  stage: release
-  image: node:24-trixie-slim
+quality:
+  stage: quality
+  image: docker:29-cli
   variables:
-    GIT_DEPTH: "0"
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends git
-    - git config user.name "gitlab-ci[bot]"
-    - git config user.email "gitlab-ci@${CI_SERVER_HOST}"
-    - git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    DOCKER_HOST: ''
   script:
-    - npm install @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/git @semantic-release/exec @semantic-release/gitlab --no-save --package-lock=false
-    - GL_TOKEN="$CI_JOB_TOKEN" npx semantic-release
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "version-16"
+    - docker compose -f ci/compose.yaml run --build --rm quality
+
+integration:
+  stage: integration
+  image: docker:29-cli
+  variables:
+    DOCKER_HOST: ''
+  script:
+    - docker compose -f ci/compose.yaml run --build --rm integration
+  after_script:
+    - docker compose -f ci/compose.yaml down --volumes --remove-orphans

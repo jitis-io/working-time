@@ -1,0 +1,110 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dedupe_key",
+  "source",
+  "severity",
+  "status",
+  "customer",
+  "project",
+  "occurrence_count",
+  "last_sent_at",
+  "message",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "dedupe_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Dedupe key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Source",
+   "read_only": 1
+  },
+  {
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Severity",
+   "options": "Info\nWarning\nError\nCritical",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Sent\nSuppressed\nFailed\nRecorded",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "occurrence_count",
+   "fieldtype": "Int",
+   "label": "Occurrence count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_sent_at",
+   "fieldtype": "Datetime",
+   "label": "Last sent at",
+   "read_only": 1
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "label": "Message",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Delivery error",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "module": "Working Time",
+ "name": "Platform Alert",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}

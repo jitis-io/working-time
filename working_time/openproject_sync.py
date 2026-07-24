@@ -986,7 +986,6 @@ def _enqueue_webhook_action(site_name: str, payload: dict[str, Any]) -> dict[str
 	if action.startswith("project:"):
 		project_id = _payload_id(payload, "project")
 		if project_id:
-			enqueue_sync_project_by_openproject_id(site_name, project_id)
 			return {"queued": True, "action": action, "project_id": project_id}
 
 	if action in {"work_package:created", "work_package:updated"}:
@@ -999,14 +998,12 @@ def _enqueue_webhook_action(site_name: str, payload: dict[str, Any]) -> dict[str
 					"work_package_id": work_package_id,
 					"reason": "deleted_object",
 				}
-			enqueue_sync_work_package(site_name, work_package_id)
 			return {"queued": True, "action": action, "work_package_id": work_package_id}
 
 	if action == "work_package:deleted":
 		work_package_id = _payload_id(payload, "work_package")
 		if work_package_id:
 			_remember_deleted_object("work_package", work_package_id)
-			enqueue_delete_work_package(work_package_id)
 			return {"queued": True, "action": action, "work_package_id": work_package_id}
 
 	if action in {"time_entry:created", "time_entry:updated"}:
@@ -1019,14 +1016,12 @@ def _enqueue_webhook_action(site_name: str, payload: dict[str, Any]) -> dict[str
 					"time_entry_id": time_entry_id,
 					"reason": "deleted_object",
 				}
-			enqueue_sync_time_entry(site_name, time_entry_id)
 			return {"queued": True, "action": action, "time_entry_id": time_entry_id}
 
 	if action == "time_entry:deleted":
 		time_entry_id = _payload_id(payload, "time_entry")
 		if time_entry_id:
 			_remember_deleted_object("time_entry", time_entry_id)
-			enqueue_delete_time_entry(time_entry_id)
 			return {"queued": True, "action": action, "time_entry_id": time_entry_id}
 
 	return {"skipped": True, "action": action, "reason": "missing_id"}
@@ -1050,24 +1045,11 @@ def _record_webhook_event(
 	status: str,
 	result: dict[str, Any] | None = None,
 	error: str | None = None,
-) -> None:
+) -> str | None:
 	try:
-		action = _normalize_id(payload.get("action"))
-		object_type, object_id = _webhook_object(payload)
-		doc = frappe.get_doc(
-			{
-				"doctype": OPENPROJECT_WEBHOOK_EVENT_DOCTYPE,
-				"openproject_site": site_name,
-				"action": action,
-				"object_type": object_type,
-				"object_id": object_id,
-				"status": status,
-				"result_json": json.dumps(result or {}, default=str, sort_keys=True),
-				"error": error,
-			}
-		)
-		doc.flags.ignore_permissions = True
-		doc.insert(ignore_permissions=True)
+		from .platform_operations import create_openproject_webhook_event
+
+		return create_openproject_webhook_event(site_name, payload, status, result, error)
 	except Exception as exc:
 		try:
 			frappe.log_error(
@@ -1076,6 +1058,7 @@ def _record_webhook_event(
 			)
 		except Exception:
 			pass
+	return None
 
 
 @frappe.whitelist(allow_guest=True)
@@ -1087,7 +1070,11 @@ def openproject_webhook(openproject_site: str | None = None) -> dict[str, Any]:
 	try:
 		result = _enqueue_webhook_action(site_name, payload)
 		status = "Ignored" if result.get("ignored") else "Queued" if result.get("queued") else "Processed"
-		_record_webhook_event(site_name, payload, status, result)
+		event_name = _record_webhook_event(site_name, payload, status, result)
+		if result.get("queued") and event_name:
+			from .platform_operations import queue_openproject_webhook_event
+
+			queue_openproject_webhook_event(event_name)
 		return result
 	except Exception as exc:
 		_record_webhook_event(site_name, payload, "Failed", error=str(exc))

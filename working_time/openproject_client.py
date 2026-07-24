@@ -50,7 +50,17 @@ class OpenProjectClient:
 			response = self.session.get(url, params=params, timeout=OPENPROJECT_REQUEST_TIMEOUT)
 		except (requests.ConnectionError, requests.Timeout) as exc:
 			raise OpenProjectTransientError(f"{url}: {exc}") from exc
+		return self._response_json(url, response)
 
+	def post(self, path: str, payload: dict):
+		url = path if path.startswith(("http://", "https://")) else f"{self.api_url}{path}"
+		try:
+			response = self.session.post(url, json=payload, timeout=OPENPROJECT_REQUEST_TIMEOUT)
+		except (requests.ConnectionError, requests.Timeout) as exc:
+			raise OpenProjectTransientError(f"{url}: {exc}") from exc
+		return self._response_json(url, response)
+
+	def _response_json(self, url: str, response):
 		try:
 			response.raise_for_status()
 		except requests.HTTPError:

@@ -1,0 +1,35 @@
+services:
+  quality:
+    build:
+      context: ..
+      dockerfile: ci/Dockerfile
+      target: base
+    command: bash /workspace/ci/run-quality.sh
+
+  integration:
+    build:
+      context: ..
+      dockerfile: ci/Dockerfile
+      target: integration
+    command: bash /workspace/ci/run-integration.sh
+    environment:
+      DB_HOST: mariadb
+      DB_ROOT_PASSWORD: root
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: mariadb:11.8
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "--host=localhost", "--user=root", "--password=root"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/mysql

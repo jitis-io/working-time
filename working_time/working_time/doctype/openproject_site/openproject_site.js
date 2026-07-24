@@ -4,27 +4,27 @@ frappe.ui.form.on("OpenProject Site", {
 			return;
 		}
 
-		frm.add_custom_button(__("Reconcile Time Entries"), async () => {
-			const { message } = await frappe.call({
-				method: "working_time.openproject_sync.reconcile_openproject_time_entries",
-				freeze: true,
-				freeze_message: __("Reconciling OpenProject time entries..."),
-			});
+		frm.add_custom_button(
+			__("Queue Time Entry Reconciliation"),
+			async () => {
+				const { message } = await frappe.call({
+					method: "working_time.platform_operations.queue_incremental_time_entry_reconciliation",
+					freeze: true,
+					freeze_message: __(
+						"Queueing OpenProject reconciliation..."
+					),
+				});
 
-			frappe.msgprint({
-				title: __("OpenProject Reconciliation Finished"),
-				message: __(
-					"Created: {0}<br>Updated: {1}<br>Unchanged: {2}<br>Locked: {3}<br>Skipped: {4}",
-					[
-						message?.created || 0,
-						message?.updated || 0,
-						message?.unchanged || 0,
-						message?.locked || 0,
-						message?.skipped || 0,
-					]
-				),
-				indicator: "green",
-			});
+				frappe.msgprint({
+					title: __("OpenProject Reconciliation Queued"),
+					message: __("Run {0} is now queued.", [message]),
+					indicator: "green",
+				});
+			}
+		);
+
+		frm.add_custom_button(__("Integration Control Center"), () => {
+			frappe.set_route("workspace", "Integration Control Center");
 		});
 	},
 });
