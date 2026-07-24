@@ -32,10 +32,13 @@ _bootstrap_frappe_stub()
 
 import frappe
 
+FrappeValidationError = getattr(frappe, "ValidationError", RuntimeError)
+
 from working_time.platform_operations import (
 	_dispatch_openproject_event,
 	_reconciliation_function,
 	_sales_order_project_name,
+	_teams_adaptive_card,
 )
 
 
@@ -53,6 +56,32 @@ class TestPlatformOperations(unittest.TestCase):
 
 		self.assertEqual(fields["teams_webhook_url"]["fieldtype"], "Small Text")
 		self.assertNotIn("keycloak_client_secret", fields)
+
+	def test_teams_alert_uses_workflow_adaptive_card_schema(self):
+		payload = _teams_adaptive_card(
+			"openproject-sync-failed",
+			"Error",
+			"Synchronization failed.",
+			"CUST-0001",
+			"PROJ-0001",
+		)
+
+		self.assertEqual(payload["type"], "message")
+		self.assertEqual(len(payload["attachments"]), 1)
+		attachment = payload["attachments"][0]
+		self.assertEqual(attachment["contentType"], "application/vnd.microsoft.card.adaptive")
+		self.assertIsNone(attachment["contentUrl"])
+		self.assertEqual(attachment["content"]["type"], "AdaptiveCard")
+		self.assertEqual(attachment["content"]["version"], "1.2")
+		self.assertEqual(attachment["content"]["body"][0]["color"], "Attention")
+		self.assertEqual(
+			attachment["content"]["body"][2]["facts"],
+			[
+				{"title": "Source", "value": "openproject-sync-failed"},
+				{"title": "Customer", "value": "CUST-0001"},
+				{"title": "Project", "value": "PROJ-0001"},
+			],
+		)
 
 	def test_dispatches_time_entry_update_to_existing_sync(self):
 		event = types.SimpleNamespace(
@@ -94,5 +123,5 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(function.__name__, "reconcile_openproject_time_entries")
 
 	def test_unknown_reconciliation_type_is_rejected(self):
-		with self.assertRaises(frappe.ValidationError):
+		with self.assertRaises(FrappeValidationError):
 			_reconciliation_function("Unknown")

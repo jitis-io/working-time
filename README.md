@@ -50,7 +50,7 @@ Want to add pretty time logs to your invoice? Check out our [print formats](http
 
 ## Platform Operations
 
-The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews and project provisioning. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Billing creates drafts only.
+The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews and project provisioning. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Alerts are sent in the Adaptive Card envelope required by the Teams Workflow webhook. Billing creates drafts only.
 
 Project provisioning creates or links an ERPNext Project and OpenProject Project after an explicit preview. Portal permissions remain owned by the portal instead of being inferred from Keycloak groups.
 

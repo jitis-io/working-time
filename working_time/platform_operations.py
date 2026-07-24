@@ -67,6 +67,52 @@ def _event_context(object_type: str | None, object_id: str | None) -> tuple[str 
 	return None, None
 
 
+def _teams_adaptive_card(
+	source: str,
+	severity: str,
+	message: str,
+	customer: str | None = None,
+	project: str | None = None,
+) -> dict[str, Any]:
+	color = {
+		"Critical": "Attention",
+		"Error": "Attention",
+		"Warning": "Warning",
+		"Info": "Accent",
+	}.get(severity, "Default")
+	facts = [{"title": _("Source"), "value": source}]
+	if customer:
+		facts.append({"title": _("Customer"), "value": customer})
+	if project:
+		facts.append({"title": _("Project"), "value": project})
+	return {
+		"type": "message",
+		"attachments": [
+			{
+				"contentType": "application/vnd.microsoft.card.adaptive",
+				"contentUrl": None,
+				"content": {
+					"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+					"type": "AdaptiveCard",
+					"version": "1.2",
+					"body": [
+						{
+							"type": "TextBlock",
+							"text": f"{severity}: {source}",
+							"weight": "Bolder",
+							"size": "Medium",
+							"color": color,
+							"wrap": True,
+						},
+						{"type": "TextBlock", "text": message, "wrap": True},
+						{"type": "FactSet", "facts": facts},
+					],
+				},
+			}
+		],
+	}
+
+
 def create_openproject_webhook_event(
 	site_name: str,
 	payload: dict[str, Any],
@@ -345,7 +391,7 @@ def send_platform_alert(
 	try:
 		response = requests.post(
 			webhook_url,
-			json={"text": f"**{severity}** · {source}\n{message}"},
+			json=_teams_adaptive_card(source, severity, message, customer, project),
 			timeout=20,
 		)
 		response.raise_for_status()
@@ -368,7 +414,7 @@ def send_test_teams_alert() -> dict[str, str]:
 	name = send_platform_alert(
 		"teams-configuration-test",
 		"Info",
-		"ERPNext successfully sent this test alert.",
+		"ERPNext sent this Adaptive Card to the configured Teams workflow.",
 		dedupe_key=f"teams-configuration-test:{_now().isoformat()}",
 	)
 	alert = frappe.get_doc("Platform Alert", name)
