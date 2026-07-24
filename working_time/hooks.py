@@ -114,6 +114,12 @@ scheduler_events = {
 		"0 2 * * *": [
 			"working_time.openproject_sync.reconcile_openproject_time_entries",
 		],
+		"30 2 * * *": [
+			"working_time.openproject_sync.reconcile_openproject_projects_and_work_packages",
+		],
+		"0 3 * * *": [
+			"working_time.openproject_sync.reconcile_openproject_time_entry_deletions",
+		],
 	},
 	"daily": [
 		"working_time.reminders.send_stale_reminders",

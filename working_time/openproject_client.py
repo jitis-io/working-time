@@ -10,6 +10,18 @@ from frappe import _
 from requests.auth import HTTPBasicAuth
 
 
+class OpenProjectNotFoundError(RuntimeError):
+	pass
+
+
+class OpenProjectTransientError(RuntimeError):
+	pass
+
+
+OPENPROJECT_REQUEST_TIMEOUT = 30
+TRANSIENT_HTTP_STATUSES = {408, 425, 429}
+
+
 def _normalize_base_url(site_url: str) -> str:
 	raw = (site_url or "").strip()
 	if not raw:
@@ -34,7 +46,10 @@ class OpenProjectClient:
 
 	def get(self, path: str, params=None):
 		url = path if path.startswith(("http://", "https://")) else f"{self.api_url}{path}"
-		response = self.session.get(url, params=params)
+		try:
+			response = self.session.get(url, params=params, timeout=OPENPROJECT_REQUEST_TIMEOUT)
+		except (requests.ConnectionError, requests.Timeout) as exc:
+			raise OpenProjectTransientError(f"{url}: {exc}") from exc
 
 		try:
 			response.raise_for_status()
@@ -50,6 +65,11 @@ class OpenProjectClient:
 				or (error_text.get("errorMessages") or [None])[0]
 				or "Something went wrong."
 			)
+
+			if response.status_code == 404:
+				raise OpenProjectNotFoundError(f"{url}: {_(error_message)}") from None
+			if response.status_code in TRANSIENT_HTTP_STATUSES or response.status_code >= 500:
+				raise OpenProjectTransientError(f"{url}: {_(error_message)}") from None
 
 			frappe.throw(f"{url}: {_(error_message)}")
 

@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-07-07 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "openproject_site",
+  "action",
+  "object_type",
+  "object_id",
+  "status",
+  "result_json",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "openproject_site",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "OpenProject Site",
+   "options": "OpenProject Site",
+   "read_only": 1
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Action",
+   "read_only": 1
+  },
+  {
+   "fieldname": "object_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Object Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "object_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Object ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Queued\nProcessed\nIgnored\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "result_json",
+   "fieldtype": "Code",
+   "label": "Result JSON",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Working Time",
+ "name": "OpenProject Webhook Event",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

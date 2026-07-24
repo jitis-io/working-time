@@ -14,7 +14,8 @@
   "api_token",
   "webhook_secret",
   "sync_section",
-  "time_entries_synced_until"
+  "time_entries_synced_until",
+  "enable_full_delete_reconciliation"
  ],
  "fields": [
   {
@@ -63,6 +64,13 @@
    "fieldtype": "Datetime",
    "label": "Time Entries Synced Until",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Enable only when the API account can see every synchronized project, work package and time entry. Missing source records are treated as deleted.",
+   "fieldname": "enable_full_delete_reconciliation",
+   "fieldtype": "Check",
+   "label": "Enable Full Delete Reconciliation"
   }
  ],
  "index_web_pages_for_search": 1,

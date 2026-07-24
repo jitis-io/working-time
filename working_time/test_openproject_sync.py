@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from contextlib import nullcontext
 from unittest.mock import patch
 
 
@@ -15,6 +16,7 @@ def _bootstrap_frappe_stub() -> None:
 	frappe._ = lambda message: message
 	frappe.throw = throw
 	frappe.db = types.SimpleNamespace(get_value=lambda *args, **kwargs: None)
+	frappe.db.exists = lambda *args, **kwargs: False
 	frappe.db.set_value = lambda *args, **kwargs: None
 	frappe.form_dict = {}
 	frappe.local = types.SimpleNamespace(request=None)
@@ -30,17 +32,36 @@ _bootstrap_frappe_stub()
 
 from working_time.openproject_sync import (
 	_enqueue_webhook_action,
+	_ensure_parent_task_is_group,
+	_is_deleted_object,
 	_parse_duration,
 	_project_customer,
+	_record_webhook_event,
 	_row_changes,
 	_task_status,
 	_time_entry_reconcile_params,
+	_webhook_object,
+	reconcile_openproject_time_entry_deletions,
+	sync_time_entry_from_openproject,
 )
 
 
 class Row:
 	def __init__(self, **values):
 		self.__dict__.update(values)
+
+	def get(self, key, default=None):
+		return getattr(self, key, default)
+
+
+class ParentTask(Row):
+	def __init__(self, **values):
+		super().__init__(**values)
+		self.flags = types.SimpleNamespace(ignore_permissions=False)
+		self.saved = False
+
+	def save(self, **kwargs):
+		self.saved = True
 
 
 class TestOpenProjectSync(unittest.TestCase):
@@ -139,6 +160,20 @@ class TestOpenProjectSync(unittest.TestCase):
 		self.assertEqual(_task_status({"_links": {"status": {"title": "In progress"}}}), "Working")
 		self.assertEqual(_task_status({"_links": {"status": {"title": "New"}}}), "Open")
 
+	def test_existing_parent_task_is_marked_group_before_child_save(self):
+		child = Row(parent_task="TASK-1")
+		parent = ParentTask(is_group=0)
+
+		with (
+			patch("working_time.openproject_sync.frappe.db.get_value", return_value=0),
+			patch("working_time.openproject_sync.frappe.get_doc", return_value=parent),
+		):
+			_ensure_parent_task_is_group(child)
+
+		self.assertEqual(parent.is_group, 1)
+		self.assertTrue(parent.flags.ignore_permissions)
+		self.assertTrue(parent.saved)
+
 	def test_webhook_dispatch_enqueues_time_entry_updates(self):
 		with patch("working_time.openproject_sync.enqueue_sync_time_entry") as enqueue:
 			result = _enqueue_webhook_action(
@@ -162,14 +197,167 @@ class TestOpenProjectSync(unittest.TestCase):
 		enqueue.assert_called_once_with("OpenProject", "42")
 		self.assertEqual(result, {"queued": True, "action": "time_entry:updated", "time_entry_id": "42"})
 
-	def test_webhook_dispatch_deletes_work_package(self):
-		with patch(
-			"working_time.openproject_sync._delete_work_package", return_value={"deleted": True}
-		) as delete:
+	def test_webhook_dispatch_queues_work_package_delete(self):
+		with (
+			patch("working_time.openproject_sync.enqueue_delete_work_package") as enqueue,
+			patch("working_time.openproject_sync._remember_deleted_object") as remember,
+		):
 			result = _enqueue_webhook_action(
 				"OpenProject",
 				{"action": "work_package:deleted", "work_package": {"id": 99}},
 			)
 
-		delete.assert_called_once_with("99")
-		self.assertEqual(result, {"action": "work_package:deleted", "deleted": True})
+		remember.assert_called_once_with("work_package", "99")
+		enqueue.assert_called_once_with("99")
+		self.assertEqual(
+			result,
+			{"queued": True, "action": "work_package:deleted", "work_package_id": "99"},
+		)
+
+	def test_webhook_dispatch_queues_time_entry_delete(self):
+		with (
+			patch("working_time.openproject_sync.enqueue_delete_time_entry") as enqueue,
+			patch("working_time.openproject_sync._remember_deleted_object") as remember,
+		):
+			result = _enqueue_webhook_action(
+				"OpenProject",
+				{"action": "time_entry:deleted", "time_entry": {"id": 42}},
+			)
+
+		remember.assert_called_once_with("time_entry", "42")
+		enqueue.assert_called_once_with("42")
+		self.assertEqual(
+			result,
+			{"queued": True, "action": "time_entry:deleted", "time_entry_id": "42"},
+		)
+
+	def test_webhook_dispatch_ignores_deleted_work_package_update(self):
+		with (
+			patch("working_time.openproject_sync._is_deleted_object", return_value=True),
+			patch("working_time.openproject_sync.enqueue_sync_work_package") as enqueue,
+		):
+			result = _enqueue_webhook_action(
+				"OpenProject",
+				{"action": "work_package:updated", "work_package": {"id": 99}},
+			)
+
+		enqueue.assert_not_called()
+		self.assertEqual(
+			result,
+			{
+				"ignored": True,
+				"action": "work_package:updated",
+				"work_package_id": "99",
+				"reason": "deleted_object",
+			},
+		)
+
+	def test_webhook_dispatch_ignores_deleted_time_entry_update(self):
+		with (
+			patch("working_time.openproject_sync._is_deleted_object", return_value=True),
+			patch("working_time.openproject_sync.enqueue_sync_time_entry") as enqueue,
+		):
+			result = _enqueue_webhook_action(
+				"OpenProject",
+				{"action": "time_entry:updated", "time_entry": {"id": 42}},
+			)
+
+		enqueue.assert_not_called()
+		self.assertEqual(
+			result,
+			{
+				"ignored": True,
+				"action": "time_entry:updated",
+				"time_entry_id": "42",
+				"reason": "deleted_object",
+			},
+		)
+
+	def test_deleted_object_lookup_falls_back_when_doctype_is_missing(self):
+		with patch("working_time.openproject_sync.frappe.db.exists", side_effect=Exception("missing")):
+			self.assertFalse(_is_deleted_object("time_entry", "42"))
+
+	def test_queued_time_entry_update_stops_at_tombstone(self):
+		with (
+			patch("working_time.openproject_sync._site_name", return_value="OpenProject"),
+			patch("working_time.openproject_sync._sync_lock", return_value=nullcontext()),
+			patch("working_time.openproject_sync._is_deleted_object", return_value=True),
+			patch("working_time.openproject_sync.OpenProjectClient") as client,
+		):
+			result = sync_time_entry_from_openproject("42", "OpenProject")
+
+		client.assert_not_called()
+		self.assertEqual(result, {"ignored": True, "reason": "deleted_object"})
+
+	def test_full_time_entry_reconciliation_deletes_missing_ids(self):
+		with (
+			patch("working_time.openproject_sync._site_name", return_value="OpenProject"),
+			patch("working_time.openproject_sync.OpenProjectClient"),
+			patch("working_time.openproject_sync._iterate", return_value=iter([{"id": 1}, {"id": 2}])),
+			patch(
+				"working_time.openproject_sync._mapped_openproject_ids",
+				return_value={"1", "2", "3"},
+			),
+			patch(
+				"working_time.openproject_sync.delete_time_entry_from_openproject",
+				return_value={"deleted": True},
+			) as delete,
+			patch(
+				"working_time.openproject_sync._full_delete_reconciliation_enabled",
+				return_value=True,
+			),
+		):
+			result = reconcile_openproject_time_entry_deletions("OpenProject")
+
+		delete.assert_called_once_with("3")
+		self.assertEqual(result, {"checked": 2, "deleted": 1, "missing": 0, "locked": 0})
+
+	def test_full_time_entry_reconciliation_is_disabled_by_default(self):
+		with (
+			patch("working_time.openproject_sync._site_name", return_value="OpenProject"),
+			patch(
+				"working_time.openproject_sync._full_delete_reconciliation_enabled",
+				return_value=False,
+			),
+			patch("working_time.openproject_sync.OpenProjectClient") as client,
+		):
+			result = reconcile_openproject_time_entry_deletions("OpenProject")
+
+		client.assert_not_called()
+		self.assertEqual(
+			result,
+			{"disabled": True, "reason": "full_delete_reconciliation_not_enabled"},
+		)
+
+	def test_webhook_object_extracts_subject_for_visibility(self):
+		self.assertEqual(
+			_webhook_object({"action": "time_entry:updated", "time_entry": {"id": 42}}),
+			("time_entry", "42"),
+		)
+
+	def test_record_webhook_event_inserts_visible_event(self):
+		inserted = []
+
+		class EventDoc(Row):
+			def __init__(self, **values):
+				super().__init__(**values)
+				self.flags = types.SimpleNamespace(ignore_permissions=False)
+
+			def insert(self, **kwargs):
+				inserted.append(self)
+
+		with patch(
+			"working_time.openproject_sync.frappe.get_doc", side_effect=lambda values: EventDoc(**values)
+		):
+			_record_webhook_event(
+				"OpenProject",
+				{"action": "time_entry:updated", "time_entry": {"id": 42}},
+				"Queued",
+				{"queued": True},
+			)
+
+		self.assertEqual(inserted[0].doctype, "OpenProject Webhook Event")
+		self.assertEqual(inserted[0].action, "time_entry:updated")
+		self.assertEqual(inserted[0].object_type, "time_entry")
+		self.assertEqual(inserted[0].object_id, "42")
+		self.assertEqual(inserted[0].status, "Queued")

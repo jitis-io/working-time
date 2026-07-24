@@ -3,17 +3,20 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import frappe
 from frappe import _
 
-from .openproject_client import OpenProjectClient
+from .openproject_client import OpenProjectClient, OpenProjectNotFoundError, OpenProjectTransientError
 from .openproject_utils import get_openproject_work_package_url
 
 SYNC_QUEUE = "long"
 SYNC_TIMEOUT = 600
+SYNC_LOCK_TIMEOUT = 900
+SYNC_LOCK_WAIT = 60
 SYNC_OVERLAP = timedelta(minutes=5)
 OPENPROJECT_WEBHOOK_ACTIONS = {
 	"project:created",
@@ -25,6 +28,8 @@ OPENPROJECT_WEBHOOK_ACTIONS = {
 	"time_entry:updated",
 	"time_entry:deleted",
 }
+OPENPROJECT_SYNC_TOMBSTONE_DOCTYPE = "OpenProject Sync Tombstone"
+OPENPROJECT_WEBHOOK_EVENT_DOCTYPE = "OpenProject Webhook Event"
 
 
 def _normalize_id(value: Any) -> str | None:
@@ -116,7 +121,11 @@ def _iterate(client: OpenProjectClient, path: str, params=None, page_size: int =
 	offset = 1
 	query = params or {}
 	while True:
-		payload = client.get(path, params={**query, "pageSize": page_size, "offset": offset})
+		payload = _openproject_get(
+			client,
+			path,
+			params={**query, "pageSize": page_size, "offset": offset},
+		)
 		elements = (payload.get("_embedded") or {}).get("elements") or []
 		if not elements:
 			break
@@ -127,6 +136,13 @@ def _iterate(client: OpenProjectClient, path: str, params=None, page_size: int =
 			break
 
 		offset += 1
+
+
+def _openproject_get(client: OpenProjectClient, path: str, params=None):
+	try:
+		return client.get(path, params=params)
+	except OpenProjectTransientError as exc:
+		raise frappe.RetryBackgroundJobError(str(exc)) from exc
 
 
 def _project_rows(project_id: str) -> list[Any]:
@@ -143,6 +159,59 @@ def _task_rows(work_package_id: str) -> list[Any]:
 		filters={"openproject_work_package_id": str(work_package_id)},
 		fields=["name"],
 	)
+
+
+def _sync_object_key(object_type: str, object_id: str) -> str:
+	return f"{object_type}:{object_id}"
+
+
+@contextmanager
+def _sync_lock(object_type: str, object_id: str):
+	site = getattr(frappe.local, "site", None) or "default"
+	name = f"{site}:working_time:openproject:{_sync_object_key(object_type, object_id)}"
+	lock = frappe.cache.lock(name, timeout=SYNC_LOCK_TIMEOUT, blocking_timeout=SYNC_LOCK_WAIT)
+	if not lock.acquire(blocking=True):
+		raise frappe.RetryBackgroundJobError(f"OpenProject sync lock is busy: {name}")
+	try:
+		yield
+	finally:
+		if lock.owned():
+			lock.release()
+
+
+def _is_deleted_object(object_type: str, object_id: str | None) -> bool:
+	object_id = _normalize_id(object_id)
+	if not object_id:
+		return False
+	try:
+		return bool(
+			frappe.db.exists(OPENPROJECT_SYNC_TOMBSTONE_DOCTYPE, _sync_object_key(object_type, object_id))
+		)
+	except Exception:
+		return False
+
+
+def _remember_deleted_object(object_type: str, object_id: str | None) -> None:
+	object_id = _normalize_id(object_id)
+	if not object_id:
+		return
+
+	name = _sync_object_key(object_type, object_id)
+	if frappe.db.exists(OPENPROJECT_SYNC_TOMBSTONE_DOCTYPE, name):
+		return
+
+	doc = frappe.get_doc(
+		{
+			"doctype": OPENPROJECT_SYNC_TOMBSTONE_DOCTYPE,
+			"name": name,
+			"sync_key": name,
+			"object_type": object_type,
+			"object_id": object_id,
+			"deleted_at": datetime.now(UTC).replace(tzinfo=None),
+		}
+	)
+	doc.flags.ignore_permissions = True
+	doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
 
 
 def validate_project_mapping_on_save(doc, method=None):
@@ -258,7 +327,7 @@ def _ensure_project(
 		frappe.throw(_("OpenProject project {0} is mapped to multiple ERPNext Projects").format(project_id))
 
 	client = OpenProjectClient(site_name)
-	payload = project_payload or client.get(f"/projects/{project_id}")
+	payload = project_payload or _openproject_get(client, f"/projects/{project_id}")
 	identifier = _project_identifier(payload, project_id)
 	notes = _project_notes(payload, identifier)
 	customer_name = _project_customer(payload)
@@ -304,6 +373,19 @@ def _task_status(work_package: dict[str, Any]) -> str:
 	return "Open"
 
 
+def _ensure_parent_task_is_group(task: Any) -> None:
+	parent_task = _normalize_id(task.get("parent_task"))
+	if not parent_task:
+		return
+	if frappe.db.get_value("Task", parent_task, "is_group"):
+		return
+
+	parent = frappe.get_doc("Task", parent_task)
+	parent.is_group = 1
+	parent.flags.ignore_permissions = True
+	parent.save(ignore_permissions=True)
+
+
 def _ensure_task(
 	work_package_id: str, work_package: dict[str, Any] | None = None, site_name: str | None = None
 ) -> str | None:
@@ -315,7 +397,7 @@ def _ensure_task(
 		)
 
 	client = OpenProjectClient(site_name)
-	payload = work_package or client.get(f"/work_packages/{work_package_id}")
+	payload = work_package or _openproject_get(client, f"/work_packages/{work_package_id}")
 	project_id = _extract_id(((payload.get("_links") or {}).get("project") or {}).get("href"))
 	if not project_id:
 		return None
@@ -345,6 +427,7 @@ def _ensure_task(
 		return task.name
 
 	task.flags.ignore_permissions = True
+	_ensure_parent_task_is_group(task)
 	if rows:
 		task.save(ignore_permissions=True)
 	else:
@@ -359,8 +442,8 @@ def _resolve_employee_from_time_entry(client: OpenProjectClient, time_entry: dic
 	)
 	if user_id and "mail" not in user and "email" not in user:
 		try:
-			user = client.get(f"/users/{user_id}") or user
-		except Exception:
+			user = _openproject_get(client, f"/users/{user_id}") or user
+		except OpenProjectNotFoundError:
 			pass
 
 	lookup_values = [
@@ -596,23 +679,49 @@ def sync_project_by_openproject_id(
 @frappe.whitelist()
 def sync_work_package_from_openproject(work_package_id: str, site_name: str | None = None) -> dict[str, Any]:
 	site_name = _site_name(site_name)
-	client = OpenProjectClient(site_name)
-	work_package = client.get(f"/work_packages/{work_package_id}")
-	project_id = _extract_id(((work_package.get("_links") or {}).get("project") or {}).get("href"))
-	if not project_id:
-		return {"skipped": True, "reason": "missing_project"}
-	project_name = _ensure_project(project_id, site_name=site_name)
-	task_name = _ensure_task(str(work_package_id), work_package, site_name=site_name)
-	return {"created_or_updated": True, "project": project_name, "task": task_name}
+	work_package_id = str(work_package_id)
+	with _sync_lock("work_package", work_package_id):
+		if _is_deleted_object("work_package", work_package_id):
+			return {"ignored": True, "reason": "deleted_object"}
+
+		client = OpenProjectClient(site_name)
+		try:
+			work_package = _openproject_get(client, f"/work_packages/{work_package_id}")
+		except OpenProjectNotFoundError:
+			_remember_deleted_object("work_package", work_package_id)
+			return _delete_work_package(work_package_id)
+
+		if _is_deleted_object("work_package", work_package_id):
+			return {"ignored": True, "reason": "deleted_object"}
+
+		project_id = _extract_id(((work_package.get("_links") or {}).get("project") or {}).get("href"))
+		if not project_id:
+			return {"skipped": True, "reason": "missing_project"}
+		project_name = _ensure_project(project_id, site_name=site_name)
+		task_name = _ensure_task(work_package_id, work_package, site_name=site_name)
+		return {"created_or_updated": True, "project": project_name, "task": task_name}
 
 
 @frappe.whitelist()
 def sync_time_entry_from_openproject(time_entry_id: str, site_name: str | None = None) -> dict[str, Any]:
 	site_name = _site_name(site_name)
-	client = OpenProjectClient(site_name)
-	time_entry = client.get(f"/time_entries/{time_entry_id}")
-	action = _upsert_time_entry(time_entry, site_name=site_name)
-	return {action: True}
+	time_entry_id = str(time_entry_id)
+	with _sync_lock("time_entry", time_entry_id):
+		if _is_deleted_object("time_entry", time_entry_id):
+			return {"ignored": True, "reason": "deleted_object"}
+
+		client = OpenProjectClient(site_name)
+		try:
+			time_entry = _openproject_get(client, f"/time_entries/{time_entry_id}")
+		except OpenProjectNotFoundError:
+			_remember_deleted_object("time_entry", time_entry_id)
+			return _delete_time_entry(time_entry_id)
+
+		if _is_deleted_object("time_entry", time_entry_id):
+			return {"ignored": True, "reason": "deleted_object"}
+
+		action = _upsert_time_entry(time_entry, site_name=site_name)
+		return {action: True}
 
 
 def _delete_time_entry(time_entry_id: str) -> dict[str, Any]:
@@ -652,6 +761,20 @@ def _delete_work_package(work_package_id: str) -> dict[str, Any]:
 		task.flags.ignore_permissions = True
 		task.save(ignore_permissions=True)
 	return {"deleted": True, "task": task.name}
+
+
+def delete_time_entry_from_openproject(time_entry_id: str) -> dict[str, Any]:
+	time_entry_id = str(time_entry_id)
+	with _sync_lock("time_entry", time_entry_id):
+		_remember_deleted_object("time_entry", time_entry_id)
+		return _delete_time_entry(time_entry_id)
+
+
+def delete_work_package_from_openproject(work_package_id: str) -> dict[str, Any]:
+	work_package_id = str(work_package_id)
+	with _sync_lock("work_package", work_package_id):
+		_remember_deleted_object("work_package", work_package_id)
+		return _delete_work_package(work_package_id)
 
 
 def _time_entry_filters(synced_until: str | None) -> list[dict[str, Any]]:
@@ -698,11 +821,118 @@ def reconcile_openproject_time_entries(openproject_site: str | None = None) -> d
 		if updated_at and (not latest_updated_at or updated_at > latest_updated_at):
 			latest_updated_at = updated_at
 
-		action = _upsert_time_entry(time_entry, site_name=site_name)
+		time_entry_id = _normalize_id(time_entry.get("id"))
+		if not time_entry_id:
+			action = "skipped"
+		else:
+			with _sync_lock("time_entry", time_entry_id):
+				action = (
+					"skipped"
+					if _is_deleted_object("time_entry", time_entry_id)
+					else _upsert_time_entry(time_entry, site_name=site_name)
+				)
 		if action not in result:
 			action = "skipped"
 		result[action] += 1
 	_remember_time_entry_cursor(site_name, latest_updated_at)
+	return result
+
+
+def _mapped_openproject_ids(doctype: str, fieldname: str) -> set[str]:
+	rows = frappe.get_all(doctype, fields=[fieldname])
+	return {
+		normalized
+		for row in rows
+		if (
+			normalized := _normalize_id(
+				row.get(fieldname) if hasattr(row, "get") else getattr(row, fieldname, None)
+			)
+		)
+	}
+
+
+def _full_delete_reconciliation_enabled(site_name: str) -> bool:
+	return bool(
+		frappe.db.get_value(
+			"OpenProject Site",
+			site_name,
+			"enable_full_delete_reconciliation",
+		)
+	)
+
+
+@frappe.whitelist()
+def reconcile_openproject_time_entry_deletions(openproject_site: str | None = None) -> dict[str, Any]:
+	site_name = _site_name(openproject_site)
+	if not _full_delete_reconciliation_enabled(site_name):
+		return {"disabled": True, "reason": "full_delete_reconciliation_not_enabled"}
+
+	client = OpenProjectClient(site_name)
+	live_ids = {
+		time_entry_id
+		for time_entry in _iterate(client, "/time_entries", params={"sortBy": json.dumps([["id", "asc"]])})
+		if (time_entry_id := _normalize_id(time_entry.get("id")))
+	}
+	missing_ids = sorted(
+		_mapped_openproject_ids("Timesheet Detail", "openproject_time_entry_id") - live_ids,
+		key=lambda value: (not value.isdigit(), int(value) if value.isdigit() else value),
+	)
+	result = {"checked": len(live_ids), "deleted": 0, "missing": 0, "locked": 0}
+	for time_entry_id in missing_ids:
+		outcome = delete_time_entry_from_openproject(time_entry_id)
+		key = next(
+			(candidate for candidate in ("deleted", "missing", "locked") if outcome.get(candidate)), "missing"
+		)
+		result[key] += 1
+	return result
+
+
+@frappe.whitelist()
+def reconcile_openproject_projects_and_work_packages(openproject_site: str | None = None) -> dict[str, Any]:
+	site_name = _site_name(openproject_site)
+	client = OpenProjectClient(site_name)
+	result = {"projects": 0, "work_packages": 0, "deleted_work_packages": 0, "skipped": 0}
+
+	for project in _iterate(client, "/projects", params={"sortBy": json.dumps([["id", "asc"]])}):
+		project_id = _normalize_id(project.get("id"))
+		if not project_id:
+			result["skipped"] += 1
+			continue
+		_ensure_project(project_id, project, site_name=site_name)
+		result["projects"] += 1
+
+	work_package_params = {
+		"filters": json.dumps([{"status": {"operator": "*", "values": []}}]),
+		"sortBy": json.dumps([["id", "asc"]]),
+	}
+	live_work_package_ids: set[str] = set()
+	for work_package in _iterate(client, "/work_packages", params=work_package_params):
+		work_package_id = _normalize_id(work_package.get("id"))
+		if work_package_id:
+			live_work_package_ids.add(work_package_id)
+		if not work_package_id or _is_deleted_object("work_package", work_package_id):
+			result["skipped"] += 1
+			continue
+		with _sync_lock("work_package", work_package_id):
+			if _is_deleted_object("work_package", work_package_id):
+				result["skipped"] += 1
+			elif _ensure_task(work_package_id, work_package, site_name=site_name):
+				result["work_packages"] += 1
+			else:
+				result["skipped"] += 1
+
+	missing_ids = _mapped_openproject_ids("Task", "openproject_work_package_id") - live_work_package_ids
+	if not _full_delete_reconciliation_enabled(site_name):
+		result["delete_reconciliation_disabled"] = True
+		return result
+
+	for work_package_id in missing_ids:
+		outcome = delete_work_package_from_openproject(work_package_id)
+		if outcome.get("deleted"):
+			result["deleted_work_packages"] += 1
+		else:
+			result["skipped"] += 1
+
 	return result
 
 
@@ -762,26 +992,90 @@ def _enqueue_webhook_action(site_name: str, payload: dict[str, Any]) -> dict[str
 	if action in {"work_package:created", "work_package:updated"}:
 		work_package_id = _payload_id(payload, "work_package")
 		if work_package_id:
+			if _is_deleted_object("work_package", work_package_id):
+				return {
+					"ignored": True,
+					"action": action,
+					"work_package_id": work_package_id,
+					"reason": "deleted_object",
+				}
 			enqueue_sync_work_package(site_name, work_package_id)
 			return {"queued": True, "action": action, "work_package_id": work_package_id}
 
 	if action == "work_package:deleted":
 		work_package_id = _payload_id(payload, "work_package")
 		if work_package_id:
-			return {"action": action, **_delete_work_package(work_package_id)}
+			_remember_deleted_object("work_package", work_package_id)
+			enqueue_delete_work_package(work_package_id)
+			return {"queued": True, "action": action, "work_package_id": work_package_id}
 
 	if action in {"time_entry:created", "time_entry:updated"}:
 		time_entry_id = _payload_id(payload, "time_entry")
 		if time_entry_id:
+			if _is_deleted_object("time_entry", time_entry_id):
+				return {
+					"ignored": True,
+					"action": action,
+					"time_entry_id": time_entry_id,
+					"reason": "deleted_object",
+				}
 			enqueue_sync_time_entry(site_name, time_entry_id)
 			return {"queued": True, "action": action, "time_entry_id": time_entry_id}
 
 	if action == "time_entry:deleted":
 		time_entry_id = _payload_id(payload, "time_entry")
 		if time_entry_id:
-			return {"action": action, **_delete_time_entry(time_entry_id)}
+			_remember_deleted_object("time_entry", time_entry_id)
+			enqueue_delete_time_entry(time_entry_id)
+			return {"queued": True, "action": action, "time_entry_id": time_entry_id}
 
 	return {"skipped": True, "action": action, "reason": "missing_id"}
+
+
+def _webhook_object(payload: dict[str, Any]) -> tuple[str | None, str | None]:
+	action = _normalize_id(payload.get("action")) or ""
+	object_type = action.split(":", 1)[0] if ":" in action else None
+	if object_type == "work_package":
+		return object_type, _payload_id(payload, "work_package")
+	if object_type == "time_entry":
+		return object_type, _payload_id(payload, "time_entry")
+	if object_type == "project":
+		return object_type, _payload_id(payload, "project")
+	return object_type, None
+
+
+def _record_webhook_event(
+	site_name: str,
+	payload: dict[str, Any],
+	status: str,
+	result: dict[str, Any] | None = None,
+	error: str | None = None,
+) -> None:
+	try:
+		action = _normalize_id(payload.get("action"))
+		object_type, object_id = _webhook_object(payload)
+		doc = frappe.get_doc(
+			{
+				"doctype": OPENPROJECT_WEBHOOK_EVENT_DOCTYPE,
+				"openproject_site": site_name,
+				"action": action,
+				"object_type": object_type,
+				"object_id": object_id,
+				"status": status,
+				"result_json": json.dumps(result or {}, default=str, sort_keys=True),
+				"error": error,
+			}
+		)
+		doc.flags.ignore_permissions = True
+		doc.insert(ignore_permissions=True)
+	except Exception as exc:
+		try:
+			frappe.log_error(
+				title="OpenProject webhook event log failed",
+				message=f"{exc}\n\n{json.dumps(payload, default=str)}",
+			)
+		except Exception:
+			pass
 
 
 @frappe.whitelist(allow_guest=True)
@@ -789,7 +1083,15 @@ def openproject_webhook(openproject_site: str | None = None) -> dict[str, Any]:
 	site_name = _site_name(openproject_site)
 	body = _request_body()
 	_verify_webhook_signature(site_name, body)
-	return _enqueue_webhook_action(site_name, _request_json())
+	payload = _request_json()
+	try:
+		result = _enqueue_webhook_action(site_name, payload)
+		status = "Ignored" if result.get("ignored") else "Queued" if result.get("queued") else "Processed"
+		_record_webhook_event(site_name, payload, status, result)
+		return result
+	except Exception as exc:
+		_record_webhook_event(site_name, payload, "Failed", error=str(exc))
+		raise
 
 
 def enqueue_sync_project_by_openproject_id(site_name: str, openproject_project_id: str) -> None:
@@ -818,6 +1120,26 @@ def enqueue_sync_time_entry(site_name: str, time_entry_id: str) -> None:
 	frappe.enqueue(
 		"working_time.openproject_sync.sync_time_entry_from_openproject",
 		site_name=site_name,
+		time_entry_id=time_entry_id,
+		queue=SYNC_QUEUE,
+		timeout=SYNC_TIMEOUT,
+		enqueue_after_commit=True,
+	)
+
+
+def enqueue_delete_work_package(work_package_id: str) -> None:
+	frappe.enqueue(
+		"working_time.openproject_sync.delete_work_package_from_openproject",
+		work_package_id=work_package_id,
+		queue=SYNC_QUEUE,
+		timeout=SYNC_TIMEOUT,
+		enqueue_after_commit=True,
+	)
+
+
+def enqueue_delete_time_entry(time_entry_id: str) -> None:
+	frappe.enqueue(
+		"working_time.openproject_sync.delete_time_entry_from_openproject",
 		time_entry_id=time_entry_id,
 		queue=SYNC_QUEUE,
 		timeout=SYNC_TIMEOUT,
