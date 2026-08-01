@@ -3,6 +3,24 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
+ "field_order": [
+  "timesheet",
+  "timesheet_detail",
+  "source_count",
+  "source_details_json",
+  "customer",
+  "project",
+  "task",
+  "work_date",
+  "sales_order",
+  "actual_hours",
+  "raw_billable_hours",
+  "hours",
+  "rate",
+  "amount",
+  "status",
+  "sales_invoice"
+ ],
  "fields": [
   {
    "fieldname": "timesheet",
@@ -15,7 +33,23 @@
   {
    "fieldname": "timesheet_detail",
    "fieldtype": "Data",
-   "label": "Timesheet Detail",
+   "hidden": 1,
+   "label": "Single Timesheet Detail",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "source_count",
+   "fieldtype": "Int",
+   "label": "Source Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_details_json",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Source Details",
+   "options": "JSON",
    "read_only": 1
   },
   {
@@ -28,8 +62,24 @@
   {
    "fieldname": "project",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Project",
    "options": "Project",
+   "read_only": 1
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Task",
+   "options": "Task",
+   "read_only": 1
+  },
+  {
+   "fieldname": "work_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Work Date",
    "read_only": 1
   },
   {
@@ -40,9 +90,25 @@
    "read_only": 1
   },
   {
+   "fieldname": "actual_hours",
+   "fieldtype": "Float",
+   "label": "Actual Hours",
+   "precision": "6",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw_billable_hours",
+   "fieldtype": "Float",
+   "label": "Raw Billable Hours",
+   "precision": "6",
+   "read_only": 1
+  },
+  {
    "fieldname": "hours",
    "fieldtype": "Float",
-   "label": "Hours",
+   "in_list_view": 1,
+   "label": "Rounded Billable Hours",
+   "precision": "2",
    "read_only": 1
   },
   {
@@ -62,7 +128,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Eligible\nMissing Project\nMissing Customer\nMissing Sales Order\nLocked\nAlready Invoiced\nInvoiced",
+   "options": "Eligible\nMissing Project\nMissing Customer\nMissing Sales Order\nLocked\nAlready Drafted\nAlready Invoiced\nDraft Created\nInvoiced",
    "read_only": 1
   },
   {

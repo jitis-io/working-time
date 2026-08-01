@@ -5,10 +5,26 @@ import unittest
 
 from frappe import _dict
 
-from working_time.working_time.doctype.working_time.working_time import aggregate_time_logs
+from working_time.working_time.doctype.working_time.working_time import (
+	aggregate_time_logs,
+	calculate_hours,
+	get_timesheet_description,
+)
 
 
 class TestWorkingTime(unittest.TestCase):
+	def test_native_task_description_does_not_require_openproject(self):
+		self.assertEqual(
+			get_timesheet_description("TASK-0001", None, ["Customer-visible note"]),
+			"TASK-0001: Customer-visible note",
+		)
+
+	def test_calculate_hours_preserves_raw_actual_and_billable_time(self):
+		actual, billable = calculate_hours(_dict(duration=7 * 60, billable="50%"))
+
+		self.assertAlmostEqual(actual, 7 / 60)
+		self.assertAlmostEqual(billable, 3.5 / 60)
+
 	def test_aggregate_time_logs(self):
 		logs = [
 			_dict(

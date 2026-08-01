@@ -47,7 +47,7 @@
    "reqd": 1
   },
   {
-   "description": "Optional. Must match the Signature secret configured on the OpenProject webhook.",
+   "description": "Required before accepting webhooks. Must match the Signature secret configured on the OpenProject webhook. Pull-only final imports can leave it empty.",
    "fieldname": "webhook_secret",
    "fieldtype": "Password",
    "label": "Webhook Secret"

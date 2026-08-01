@@ -8,9 +8,11 @@ from frappe import _
 from frappe.query_builder.functions import Sum
 from frappe.utils.data import getdate
 
+from working_time.permissions import require_employee_access
+
 
 def execute(filters):
-	employee = filters.get("employee")
+	employee = require_employee_access(filters.get("employee"))
 	from_date = getdate(filters.get("from_date"))
 	to_date = getdate(filters.get("to_date"))
 	daily_working_hours = filters.get("daily_working_hours")
@@ -89,6 +91,7 @@ def daterange(start_date, end_date):
 
 
 def get_data(employee, from_date, to_date, daily_working_hours, fieldname):
+	employee = require_employee_access(employee)
 	working_time = frappe.qb.DocType("Working Time")
 	holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
 	attendance_list = frappe.get_all(

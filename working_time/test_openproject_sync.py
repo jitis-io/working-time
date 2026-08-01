@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import sys
 import types
 import unittest
@@ -9,26 +11,41 @@ def _bootstrap_frappe_stub() -> None:
 	if "frappe" in sys.modules:
 		return
 
-	def throw(message):
-		raise RuntimeError(message)
+	permission_error = type("PermissionError", (Exception,), {})
+
+	def throw(message, exc=None, *args, **kwargs):
+		del args, kwargs
+		raise (exc or RuntimeError)(message)
 
 	frappe = types.ModuleType("frappe")
 	frappe._ = lambda message: message
 	frappe.throw = throw
+	frappe.ValidationError = RuntimeError
+	frappe.PermissionError = permission_error
 	frappe.db = types.SimpleNamespace(get_value=lambda *args, **kwargs: None)
 	frappe.db.exists = lambda *args, **kwargs: False
 	frappe.db.set_value = lambda *args, **kwargs: None
+	frappe.db.escape = lambda value: repr(value)
 	frappe.form_dict = {}
-	frappe.local = types.SimpleNamespace(request=None)
+	frappe.local = types.SimpleNamespace(request=None, lang="en")
+	frappe.session = types.SimpleNamespace(user="test@example.com")
 	frappe.get_request_header = lambda *args, **kwargs: None
+	frappe.get_roles = lambda *args, **kwargs: []
 	frappe.get_all = lambda *args, **kwargs: []
+	frappe.get_value = lambda *args, **kwargs: None
 	frappe.get_doc = lambda *args, **kwargs: None
+	frappe.has_permission = lambda *args, **kwargs: True
 	frappe.enqueue = lambda *args, **kwargs: None
+	frappe.only_for = lambda *args, **kwargs: None
 	frappe.whitelist = lambda *args, **kwargs: lambda fn: fn
 	sys.modules["frappe"] = frappe
 
 
 _bootstrap_frappe_stub()
+
+import frappe
+
+FrappeValidationError = getattr(frappe, "ValidationError", RuntimeError)
 
 from working_time.openproject_sync import (
 	_enqueue_webhook_action,
@@ -40,6 +57,7 @@ from working_time.openproject_sync import (
 	_row_changes,
 	_task_status,
 	_time_entry_reconcile_params,
+	_verify_webhook_signature,
 	_webhook_object,
 	reconcile_openproject_time_entry_deletions,
 	sync_time_entry_from_openproject,
@@ -65,6 +83,25 @@ class ParentTask(Row):
 
 
 class TestOpenProjectSync(unittest.TestCase):
+	def test_webhook_without_configured_secret_fails_closed(self):
+		site = Row(get_password=lambda **kwargs: "")
+		with (
+			patch("working_time.openproject_sync.frappe.get_doc", return_value=site),
+			self.assertRaises(FrappeValidationError),
+		):
+			_verify_webhook_signature("OpenProject", b"payload")
+
+	def test_webhook_with_matching_signature_is_accepted(self):
+		body = b'{"action":"time_entry:updated"}'
+		secret = "correct-horse-battery-staple"
+		signature = "sha1=" + hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()
+		site = Row(get_password=lambda **kwargs: secret)
+		with (
+			patch("working_time.openproject_sync.frappe.get_doc", return_value=site),
+			patch("working_time.openproject_sync.frappe.get_request_header", return_value=signature),
+		):
+			_verify_webhook_signature("OpenProject", body)
+
 	def test_project_customer_uses_project_identifier(self):
 		project_payload = {"identifier": "K-2601002", "name": "K-2601002"}
 

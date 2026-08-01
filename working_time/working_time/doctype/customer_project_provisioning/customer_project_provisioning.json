@@ -10,9 +10,6 @@
   "customer",
   "status",
   "erpnext_project",
-  "openproject_site",
-  "openproject_project_id",
-  "openproject_url",
   "preview_json",
   "steps",
   "error",
@@ -51,26 +48,6 @@
    "fieldtype": "Link",
    "label": "ERPNext Project",
    "options": "Project",
-   "read_only": 1
-  },
-  {
-   "fieldname": "openproject_site",
-   "fieldtype": "Link",
-   "label": "OpenProject Site",
-   "options": "OpenProject Site",
-   "read_only": 1
-  },
-  {
-   "fieldname": "openproject_project_id",
-   "fieldtype": "Data",
-   "label": "OpenProject Project ID",
-   "read_only": 1
-  },
-  {
-   "fieldname": "openproject_url",
-   "fieldtype": "Data",
-   "label": "OpenProject URL",
-   "options": "URL",
    "read_only": 1
   },
   {

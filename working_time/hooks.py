@@ -84,13 +84,13 @@ after_migrate = "working_time.install.after_migrate"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Working Time": "working_time.permissions.working_time_query_conditions",
+}
+
+has_permission = {
+	"Working Time": "working_time.permissions.working_time_has_permission",
+}
 
 # DocType Class
 # ---------------
@@ -120,17 +120,6 @@ scheduler_events = {
 	# 	"all": [
 	# 		"working_time.tasks.all"
 	# 	],
-	"cron": {
-		"0 2 * * *": [
-			"working_time.platform_operations.queue_incremental_time_entry_reconciliation",
-		],
-		"30 2 * * *": [
-			"working_time.platform_operations.queue_project_and_work_package_reconciliation",
-		],
-		"0 3 * * *": [
-			"working_time.platform_operations.queue_time_entry_deletion_reconciliation",
-		],
-	},
 	"daily": [
 		"working_time.reminders.send_stale_reminders",
 		"working_time.reminders.send_month_end_reminders",
@@ -259,6 +248,7 @@ working_time_custom_fields = {
 			"insert_after": "openproject_url",
 			"translatable": 0,
 			"hidden": 1,
+			"read_only": 1,
 			"description": "OpenProject numeric project ID for traceability.",
 		},
 	],
@@ -279,6 +269,7 @@ working_time_custom_fields = {
 			"insert_after": "openproject_url",
 			"translatable": 0,
 			"hidden": 1,
+			"read_only": 1,
 			"description": "OpenProject numeric work package ID for traceability.",
 		},
 	],

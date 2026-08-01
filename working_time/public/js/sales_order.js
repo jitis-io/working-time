@@ -18,7 +18,7 @@ frappe.ui.form.on("Sales Order", {
 			const details = JSON.stringify(result.preview || {}, null, 2);
 			frappe.confirm(
 				__(
-					"Provision the ERPNext and OpenProject projects for this Sales Order?<br><br><pre>{0}</pre>",
+					"Provision the ERPNext project for this Sales Order?<br><br><pre>{0}</pre>",
 					[frappe.utils.escape_html(details)]
 				),
 				async () => {

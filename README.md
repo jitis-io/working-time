@@ -1,15 +1,16 @@
-Timetracking and Attendance in ERPNext, integrated with OpenProject
+Time tracking, attendance and billing review in ERPNext
 
 ## Who is this for?
 
-Companies that use OpenProject for project management and ERPNext for time tracking and billing.
+Teams that use ERPNext Projects and Tasks as the ongoing work-management and billing source. OpenProject remains available only for the controlled final import.
 
 ## Features
 
 - Allows logging of miscellanous time, project time and breaks
 - Allows to set a percentage of working time as billable time in a Working Time Log
-- Rounds billable time to 5 minutes
-- Fetches work package titles from OpenProject (used as time log description)
+- Preserves actual and raw billable time without rounding
+- Rounds billable time upward to 15-minute increments only after daily customer/project/task aggregation
+- Uses ERPNext Tasks and local customer notes for Timesheet descriptions without a runtime OpenProject lookup
 - Creates ERPNext **Timesheets**
 - Creates ERPNext **Attendances**
 - Report of actual vs. expected working time per Employee
@@ -32,16 +33,18 @@ Companies that use OpenProject for project management and ERPNext for time track
    bench install-app working_time
    ```
 
-- Create an **OpenProject Site**, enter your _Site URL_, _Username_ and _API Token_
 - Enable _Ignore Employee Time Overlap_ and _Ignore User Time Overlap_ in **Projects Settings**
+- Link each employee login in **Employee > User ID**. Except for System Managers, Working Time lists,
+  documents and reports fail closed when this mapping is missing and are restricted to that Employee.
 - Open or create an ERPNext **Project**
-    - Link it to your **OpenProject Site**
+    - Link it to its customer and source Sales Order
     - Set the _Billing Rate per Hour_
+- Create ERPNext **Tasks** for traceable customer and internal work
 - Create **Activity Cost** records for your **Employees** (_Activity Type_: "Default")
 - Create your first **Working Time**
     - Add a time log with description,
     - Add a time log and mark it as a break,
-    - Add a time log and link it to a _Project_ and OpenProject _Work Package ID_
+    - Add a time log and link it to a _Project_ and _Task_
 - Submit your **Working Time**
 
 ## Further Reading
@@ -52,13 +55,31 @@ Want to add pretty time logs to your invoice? Check out our [print formats](http
 
 The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews and project provisioning. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Alerts are sent in the Adaptive Card envelope required by the Teams Workflow webhook. Billing creates drafts only.
 
-Project provisioning creates or links an ERPNext Project and OpenProject Project after an explicit preview. Portal permissions remain owned by the portal instead of being inferred from Keycloak groups.
+OpenProject reconciliation is intentionally not scheduled. For the controlled final import, open the **OpenProject Site** and use **Queue one-time reconciliation** as a System Manager. Run the required types deliberately and review each result in the Integration Control Center. Do not enable full deletion reconciliation unless the API account can see every source record.
+
+OpenProject webhooks fail closed: requests are rejected when the configured site has no webhook secret. A pull-only final import does not require a webhook secret, but no webhook can be accepted until one is configured.
+
+Project provisioning creates or links only the ERPNext Project after an explicit preview. It no longer creates OpenProject projects. Portal permissions remain owned by the portal.
 
 Run Docker quality and clean-bench integration checks before committing; see AGENTS.md.
 
+## Upgrade to 1.1.0
+
+Version 1.1.0 is a forward-only transition away from OpenProject as the ongoing work-management source:
+
+- Deploy with `bench --site <site> migrate`, `bench build --app working_time`, and `bench restart`.
+- OpenProject webhook requests now require a configured signature secret and otherwise fail closed.
+- Automatic OpenProject reconciliation jobs were removed. If a final import is still required, queue each required reconciliation once from the OpenProject Site and inspect the run before continuing.
+- Sales Order project provisioning creates only ERPNext Projects and never creates new OpenProject projects.
+- Working Time access is employee-scoped for list, read, create, write, submit, cancel, delete, amend and
+  both reports. System Managers remain unrestricted; users without an Employee mapping are denied.
+- New Working Time submissions preserve raw actual and raw billable hours. Billing Review aggregates billable time by customer, project, task and work date and then rounds the aggregate upward to 15 minutes.
+- Creating Sales Invoices leaves the review and its rows at **Draft Created**. Review and submit the invoices manually, then use **Finalize submitted invoices** to mark the review **Invoiced**.
+- The migration reclassifies old reviews whose linked Sales Invoices are still drafts. It deliberately does not rewrite historical Timesheet rows: values created by the previous five-minute rounding remain historical records. Correct submitted history only through the normal ERPNext cancellation/amendment process with an audit trail.
+
 ## License
 
-ERPNext extension "Working Time": Timetracking and Attendance in ERPNext, integrated with OpenProject.
+ERPNext extension "Working Time": time tracking, attendance and billing review in ERPNext.
 Copyright (C) 2024 ALYF GmbH and contributors
 
 This program is free software: you can redistribute it and/or modify

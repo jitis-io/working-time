@@ -4,6 +4,8 @@
 import frappe
 from frappe.query_builder.functions import Sum
 
+from working_time.permissions import require_employee_access
+
 COLUMNS = [
 	{
 		"fieldname": "employee",
@@ -36,8 +38,10 @@ COLUMNS = [
 
 
 def execute(filters=None):
+	filters = filters or {}
 	working_time = frappe.qb.DocType("Working Time")
-	data = (
+	employee = require_employee_access()
+	query = (
 		frappe.qb.from_(working_time)
 		.select(
 			working_time.employee,
@@ -48,7 +52,9 @@ def execute(filters=None):
 		.where(working_time.docstatus == 1)
 		.where(working_time.date >= filters.get("from_date"))
 		.where(working_time.date <= filters.get("to_date"))
-		.groupby(working_time.employee)
-		.run(as_dict=True)
 	)
+	if employee:
+		query = query.where(working_time.employee == employee)
+
+	data = query.groupby(working_time.employee).run(as_dict=True)
 	return COLUMNS, data

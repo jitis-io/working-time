@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
 import frappe
 import requests
 from frappe import _
 
-from .openproject_client import OpenProjectClient
-
 SYNC_QUEUE = "long"
 SYNC_TIMEOUT = 600
+QUARTER_HOUR = Decimal("0.25")
+CLAIMED_BILLING_STATUSES = ("Draft Created", "Invoiced", "Already Invoiced")
 
 
 def _now() -> datetime:
@@ -246,7 +247,14 @@ def retry_openproject_webhook_event(event_name: str) -> dict[str, str]:
 	return {"name": event.name, "status": "Queued"}
 
 
+@frappe.whitelist()
 def queue_reconciliation(reconciliation_type: str, openproject_site: str | None = None) -> str:
+	"""Queue an explicit, one-time OpenProject reconciliation run.
+
+	Reconciliation is intentionally not scheduled. This endpoint exists only for
+	the controlled final import and is restricted to System Managers.
+	"""
+	_only_system_manager()
 	from .openproject_sync import _site_name
 
 	site_name = _site_name(openproject_site)
@@ -268,18 +276,6 @@ def queue_reconciliation(reconciliation_type: str, openproject_site: str | None 
 		enqueue_after_commit=True,
 	)
 	return doc.name
-
-
-def queue_incremental_time_entry_reconciliation() -> str:
-	return queue_reconciliation("Time Entries")
-
-
-def queue_project_and_work_package_reconciliation() -> str:
-	return queue_reconciliation("Projects and Work Packages")
-
-
-def queue_time_entry_deletion_reconciliation() -> str:
-	return queue_reconciliation("Time Entry Deletions")
 
 
 def _reconciliation_function(reconciliation_type: str):
@@ -429,19 +425,11 @@ def _sales_order_project_name(sales_order: Any) -> str:
 	return f"{sales_order.customer_name or sales_order.customer} — {sales_order.name}"
 
 
-def _openproject_site_name() -> str:
-	sites = frappe.get_all("OpenProject Site", pluck="name")
-	if len(sites) != 1:
-		frappe.throw(_("Exactly one OpenProject Site must be configured for customer provisioning."))
-	return sites[0]
-
-
 def _provisioning_preview(sales_order: Any) -> dict[str, Any]:
 	return {
 		"sales_order": sales_order.name,
 		"customer": sales_order.customer,
 		"erpnext_project": _sales_order_project_name(sales_order),
-		"openproject_project_identifier": f"so-{sales_order.name}".lower(),
 	}
 
 
@@ -461,7 +449,6 @@ def prepare_customer_project_provisioning(sales_order_name: str) -> dict[str, An
 			"sales_order": sales_order.name,
 			"customer": sales_order.customer,
 			"status": "Preview",
-			"openproject_site": _openproject_site_name(),
 			"preview_json": _json(_provisioning_preview(sales_order)),
 		}
 	)
@@ -512,22 +499,6 @@ def _ensure_erpnext_project(provisioning: Any, sales_order: Any) -> str:
 	return project.name
 
 
-def _ensure_openproject_project(provisioning: Any, sales_order: Any) -> dict[str, Any]:
-	if provisioning.openproject_project_id:
-		return {
-			"id": provisioning.openproject_project_id,
-			"url": provisioning.openproject_url,
-		}
-	client = OpenProjectClient(provisioning.openproject_site)
-	identifier = f"so-{sales_order.name}".lower()
-	payload = client.post(
-		"/projects",
-		{"name": _sales_order_project_name(sales_order), "identifier": identifier},
-	)
-	project_id = str(payload["id"])
-	return {"id": project_id, "url": f"{client.base_url}/projects/{project_id}"}
-
-
 def process_customer_project_provisioning(provisioning_name: str) -> dict[str, str]:
 	doc = frappe.get_doc("Customer Project Provisioning", provisioning_name)
 	doc.status = "Processing"
@@ -538,18 +509,6 @@ def process_customer_project_provisioning(provisioning_name: str) -> dict[str, s
 		project_name = _ensure_erpnext_project(doc, sales_order)
 		doc.erpnext_project = project_name
 		_append_step(doc, "ERPNext Project", "Completed", project_name)
-		doc.save(ignore_permissions=True)
-
-		op_project = _ensure_openproject_project(doc, sales_order)
-		doc.openproject_project_id = op_project["id"]
-		doc.openproject_url = op_project["url"]
-		frappe.db.set_value(
-			"Project",
-			project_name,
-			{"openproject_project_id": op_project["id"], "openproject_url": op_project["url"]},
-			update_modified=False,
-		)
-		_append_step(doc, "OpenProject Project", "Completed", op_project["id"])
 		doc.save(ignore_permissions=True)
 
 		doc.status = "Completed"
@@ -572,20 +531,79 @@ def process_customer_project_provisioning(provisioning_name: str) -> dict[str, s
 		raise
 
 
-def _billing_status(detail: Any, timesheet: Any) -> tuple[str, dict[str, Any]]:
+def _document_value(document: Any, fieldname: str, default: Any = None) -> Any:
+	if hasattr(document, "get"):
+		return document.get(fieldname, default)
+	return getattr(document, fieldname, default)
+
+
+def _decimal(value: Any) -> Decimal:
+	return Decimal(str(value or 0))
+
+
+def _round_billable_hours(hours: Any) -> float:
+	"""Round a non-negative aggregate upward to the next quarter hour."""
+	value = max(_decimal(hours), Decimal(0))
+	if not value:
+		return 0.0
+	return float((value / QUARTER_HOUR).to_integral_value(rounding=ROUND_CEILING) * QUARTER_HOUR)
+
+
+def _billing_date(detail: Any, timesheet: Any) -> str:
+	value = _document_value(detail, "from_time") or _document_value(timesheet, "start_date")
+	if isinstance(value, datetime):
+		return value.date().isoformat()
+	if hasattr(value, "isoformat"):
+		return value.isoformat()
+	return str(value or "")[:10]
+
+
+def _billing_source_references(item: Any) -> set[str]:
+	references: set[str] = set()
+	raw = _document_value(item, "source_details_json") or ""
+	if raw:
+		try:
+			for source in json.loads(raw):
+				if source.get("timesheet_detail"):
+					references.add(str(source["timesheet_detail"]))
+		except (TypeError, ValueError):
+			pass
+	legacy_reference = _document_value(item, "timesheet_detail")
+	if legacy_reference:
+		references.add(str(legacy_reference))
+	return references
+
+
+def _claimed_billing_sources(exclude_review: str | None = None) -> dict[str, str]:
+	filters: dict[str, Any] = {"status": ["in", list(CLAIMED_BILLING_STATUSES)]}
+	if exclude_review:
+		filters["parent"] = ["!=", exclude_review]
+	items = frappe.get_all(
+		"Billing Review Item",
+		filters=filters,
+		fields=["timesheet_detail", "source_details_json", "status"],
+	)
+	claimed: dict[str, str] = {}
+	for item in items:
+		for source in _billing_source_references(item):
+			claimed[source] = item.status
+	return claimed
+
+
+def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, dict[str, Any]]:
 	project_name = detail.get("project")
 	if not project_name:
 		return "Missing Project", {}
 	project = frappe.get_doc("Project", project_name)
 	if not project.customer:
-		return "Missing Customer", {}
+		return "Missing Customer", {"project": project}
 	sales_order = project.get("source_sales_order")
 	if not sales_order or not frappe.db.exists("Sales Order", {"name": sales_order, "docstatus": 1}):
 		return "Missing Sales Order", {"project": project}
-	if frappe.db.exists(
-		"Billing Review Item",
-		{"timesheet_detail": detail.name, "status": ["in", ["Invoiced", "Already Invoiced"]]},
-	):
+	claimed_status = claimed_sources.get(str(detail.name))
+	if claimed_status == "Draft Created":
+		return "Already Drafted", {"project": project, "sales_order": sales_order}
+	if claimed_status:
 		return "Already Invoiced", {"project": project, "sales_order": sales_order}
 	if frappe.db.exists(
 		"OpenProject Webhook Event",
@@ -593,6 +611,61 @@ def _billing_status(detail: Any, timesheet: Any) -> tuple[str, dict[str, Any]]:
 	):
 		return "Locked", {"project": project, "sales_order": sales_order}
 	return "Eligible", {"project": project, "sales_order": sales_order}
+
+
+def _aggregate_billing_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+	"""Aggregate raw source entries before applying commercial rounding."""
+	groups: dict[tuple[str, str, str | None, str], dict[str, Any]] = {}
+	for source in sources:
+		key = (source["customer"], source["project"], source.get("task"), source["work_date"])
+		if key not in groups:
+			groups[key] = {
+				**source,
+				"_actual_hours": Decimal(0),
+				"_raw_billable_hours": Decimal(0),
+				"sources": [],
+			}
+		group = groups[key]
+		group["_actual_hours"] += _decimal(source.get("actual_hours"))
+		group["_raw_billable_hours"] += _decimal(source.get("raw_billable_hours"))
+		group["sources"].append(
+			{
+				"timesheet": source["timesheet"],
+				"timesheet_detail": source["timesheet_detail"],
+			}
+		)
+
+	result: list[dict[str, Any]] = []
+	for group in groups.values():
+		raw_billable_hours = group.pop("_raw_billable_hours")
+		actual_hours = group.pop("_actual_hours")
+		group["sources"].sort(key=lambda source: source["timesheet_detail"])
+		group["actual_hours"] = float(actual_hours)
+		group["raw_billable_hours"] = float(raw_billable_hours)
+		group["hours"] = _round_billable_hours(raw_billable_hours)
+		group["amount"] = group["hours"] * float(group["rate"] or 0)
+		result.append(group)
+	return result
+
+
+def _billing_source(detail: Any, timesheet: Any, status: str, context: dict[str, Any]) -> dict[str, Any]:
+	project = context.get("project")
+	billing_hours = detail.get("billing_hours")
+	if billing_hours is None:
+		billing_hours = detail.get("hours") if detail.get("is_billable") else 0
+	return {
+		"timesheet": timesheet.name,
+		"timesheet_detail": detail.name,
+		"customer": project.customer if project else None,
+		"project": project.name if project else detail.get("project"),
+		"task": detail.get("task"),
+		"sales_order": context.get("sales_order"),
+		"work_date": _billing_date(detail, timesheet),
+		"actual_hours": float(detail.get("hours") or 0),
+		"raw_billable_hours": float(billing_hours or 0),
+		"rate": float((project.get("billing_rate") if project else 0) or 0),
+		"status": status,
+	}
 
 
 @frappe.whitelist()
@@ -613,32 +686,69 @@ def create_billing_review(period_start: str, period_end: str) -> dict[str, Any]:
 		filters={"docstatus": 1, "start_date": ("<=", period_end), "end_date": (">=", period_start)},
 		fields=["name"],
 	)
+	claimed_sources = _claimed_billing_sources()
+	eligible_sources: list[dict[str, Any]] = []
+	exception_sources: list[dict[str, Any]] = []
 	counts: dict[str, int] = {}
 	for row in timesheets:
 		timesheet = frappe.get_doc("Timesheet", row.name)
 		for detail in timesheet.get("time_logs") or []:
-			status, context = _billing_status(detail, timesheet)
-			project = context.get("project")
-			hours = float(detail.get("billing_hours") or detail.get("hours") or 0)
-			rate = float((project.get("billing_rate") if project else 0) or 0)
-			review.append(
-				"items",
-				{
-					"timesheet": timesheet.name,
-					"timesheet_detail": detail.name,
-					"customer": project.customer if project else None,
-					"project": project.name if project else None,
-					"sales_order": context.get("sales_order"),
-					"hours": hours,
-					"rate": rate,
-					"amount": hours * rate,
-					"status": status,
-				},
-			)
+			work_date = _billing_date(detail, timesheet)
+			if not work_date or not period_start <= work_date <= period_end:
+				continue
+			billing_hours = detail.get("billing_hours")
+			if billing_hours is None:
+				billing_hours = detail.get("hours") if detail.get("is_billable") else 0
+			if float(billing_hours or 0) <= 0:
+				continue
+			status, context = _billing_status(detail, claimed_sources)
+			source = _billing_source(detail, timesheet, status, context)
+			if status == "Eligible":
+				eligible_sources.append(source)
+			else:
+				exception_sources.append(source)
 			counts[status] = counts.get(status, 0) + 1
-	review.result_json = _json(counts)
+
+	eligible_groups = _aggregate_billing_sources(eligible_sources)
+	for item in eligible_groups:
+		sources = item.pop("sources")
+		review.append(
+			"items",
+			{
+				**item,
+				"timesheet": sources[0]["timesheet"],
+				"timesheet_detail": sources[0]["timesheet_detail"] if len(sources) == 1 else None,
+				"source_count": len(sources),
+				"source_details_json": _json(sources),
+			},
+		)
+	for item in exception_sources:
+		sources = [{"timesheet": item["timesheet"], "timesheet_detail": item["timesheet_detail"]}]
+		review.append(
+			"items",
+			{
+				**item,
+				"hours": _round_billable_hours(item["raw_billable_hours"]),
+				"amount": 0,
+				"source_count": 1,
+				"source_details_json": _json(sources),
+			},
+		)
+	result = {
+		"source_counts": counts,
+		"eligible_group_count": len(eligible_groups),
+		"rounding_minutes": 15,
+	}
+	review.result_json = _json(result)
 	review.insert(ignore_permissions=True)
-	return {"name": review.name, "counts": counts}
+	return {"name": review.name, "counts": counts, "eligible_group_count": len(eligible_groups)}
+
+
+def _invoice_description(item: Any) -> str:
+	parts = [f"Service time on {item.work_date}", f"project {item.project}"]
+	if item.task:
+		parts.append(f"task {item.task}")
+	return " — ".join(parts)
 
 
 @frappe.whitelist()
@@ -650,10 +760,22 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	review = frappe.get_doc("Billing Review", review_name)
 	if review.status != "Preview":
 		frappe.throw(_("Only a billing preview can create invoice drafts."))
+	eligible_items = [item for item in review.items if item.status == "Eligible"]
+	if not eligible_items:
+		frappe.throw(_("This billing preview has no eligible rows."))
+	claimed_sources = _claimed_billing_sources(exclude_review=review.name)
+	conflicts = sorted(
+		set().union(*(_billing_source_references(item) for item in eligible_items)) & set(claimed_sources)
+	)
+	if conflicts:
+		frappe.throw(
+			_("Billing sources are already assigned to another draft or invoice: {0}").format(
+				", ".join(conflicts)
+			)
+		)
 	groups: dict[tuple[str, str], list[Any]] = {}
-	for item in review.items:
-		if item.status == "Eligible":
-			groups.setdefault((item.customer, item.sales_order), []).append(item)
+	for item in eligible_items:
+		groups.setdefault((item.customer, item.sales_order), []).append(item)
 	invoices: list[str] = []
 	for (customer, sales_order_name), items in groups.items():
 		sales_order = frappe.get_doc("Sales Order", sales_order_name)
@@ -670,7 +792,7 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 						"rate": item.rate,
 						"project": item.project,
 						"sales_order": sales_order_name,
-						"description": f"Time from {item.timesheet}",
+						"description": _invoice_description(item),
 					}
 					for item in items
 				],
@@ -679,13 +801,49 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 		invoice.insert(ignore_permissions=True)
 		invoices.append(invoice.name)
 		for item in items:
-			item.status = "Invoiced"
+			item.status = "Draft Created"
 			item.sales_invoice = invoice.name
 	review.created_invoice_count = len(invoices)
-	review.status = "Invoiced"
-	review.result_json = _json({"sales_invoices": invoices})
+	review.status = "Draft Created"
+	review.result_json = _json({"sales_invoices": invoices, "status": "Draft Created"})
 	review.save(ignore_permissions=True)
 	return {"name": review.name, "sales_invoices": invoices}
+
+
+@frappe.whitelist()
+def finalize_billing_review(review_name: str) -> dict[str, Any]:
+	"""Mark a billing review invoiced after its draft invoices were submitted manually."""
+	_only_system_manager()
+	review = frappe.get_doc("Billing Review", review_name)
+	if review.status == "Invoiced":
+		return {"name": review.name, "status": review.status}
+	if review.status != "Draft Created":
+		frappe.throw(_("Only a review with draft invoices can be finalized."))
+
+	invoices = sorted({item.sales_invoice for item in review.items if item.sales_invoice})
+	if not invoices:
+		frappe.throw(_("This billing review has no linked Sales Invoices."))
+	not_submitted = [
+		invoice
+		for invoice in invoices
+		if int(frappe.db.get_value("Sales Invoice", invoice, "docstatus") or 0) != 1
+	]
+	if not_submitted:
+		frappe.throw(
+			_("Submit the linked Sales Invoices before finalizing this review: {0}").format(
+				", ".join(not_submitted)
+			)
+		)
+
+	for item in review.items:
+		if item.status == "Draft Created":
+			item.status = "Invoiced"
+	review.status = "Invoiced"
+	review.result_json = _json(
+		{"sales_invoices": invoices, "status": "Invoiced", "finalized_at": _now().isoformat()}
+	)
+	review.save(ignore_permissions=True)
+	return {"name": review.name, "status": review.status, "sales_invoices": invoices}
 
 
 @frappe.whitelist()

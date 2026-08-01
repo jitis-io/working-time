@@ -40,10 +40,12 @@
   },
   {
    "columns": 1,
+   "description": "Read-only reference retained for imported OpenProject history.",
    "fieldname": "key",
    "fieldtype": "Data",
-   "in_list_view": 1,
-    "label": "Work Package ID"
+   "hidden": 1,
+   "label": "Legacy Work Package ID",
+   "read_only": 1
   },
   {
    "columns": 1,
@@ -89,7 +91,7 @@
    "options": "0%\n25%\n50%\n75%\n100%\n125%\n150%"
   },
   {
-    "description": "If the Work Package ID is missing or needs additional explanation. Start with a \"+\" to get this printed on the invoice.",
+    "description": "Start with a \"+\" to include this note in billing output; other notes remain internal.",
    "fieldname": "note",
    "fieldtype": "Small Text",
    "in_list_view": 1,

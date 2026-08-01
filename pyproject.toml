@@ -3,7 +3,7 @@ name = "working_time"
 authors = [
     { name = "JITIS GmbH", email = "info@jitis.io"}
 ]
-description = "Timetracking and Attendance in ERPNext, integrated with OpenProject"
+description = "Time tracking, attendance and billing review in ERPNext"
 requires-python = ">=3.11"
 readme = "README.md"
 dynamic = ["version"]

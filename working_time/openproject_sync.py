@@ -954,7 +954,7 @@ def _request_json() -> dict[str, Any]:
 def _verify_webhook_signature(site_name: str, body: bytes) -> None:
 	secret = frappe.get_doc("OpenProject Site", site_name).get_password(fieldname="webhook_secret") or ""
 	if not secret:
-		return
+		frappe.throw(_("OpenProject webhook secret is not configured"))
 
 	signature = frappe.get_request_header("X-OP-Signature") or ""
 	expected = "sha1=" + hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()

@@ -1,5 +1,7 @@
 import frappe
 
+from working_time.permissions import get_user_employee, is_system_manager, require_employee_access
+
 
 @frappe.whitelist()
 def get_employee_working_hours(employee: str):
@@ -7,9 +9,10 @@ def get_employee_working_hours(employee: str):
 	if not isinstance(employee, str):
 		raise ValueError("Employee should be a string")
 
-	frappe.has_permission("Employee", throw=True)
 	if not employee:
 		return None
+	employee = require_employee_access(employee)
+	frappe.has_permission("Employee", "read", employee, throw=True)
 	working_hours_per_week = frappe.get_value("Employee", employee, "working_hours_per_week")
 	if working_hours_per_week:
 		return working_hours_per_week / 5
@@ -17,4 +20,6 @@ def get_employee_working_hours(employee: str):
 
 @frappe.whitelist()
 def get_employee_name():
-	return frappe.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if is_system_manager():
+		return get_user_employee()
+	return require_employee_access()
