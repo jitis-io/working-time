@@ -7,6 +7,22 @@ from frappe.translate import print_language
 from frappe.utils.data import get_url
 
 
+def create_daily_drafts():
+	settings = frappe.get_single("Working Time Settings")
+	if not settings.create_daily_drafts:
+		return
+	today = date.today()
+	for employee in frappe.get_all(
+		"Employee", filters={"status": "Active", "user_id": ("is", "set")}, pluck="name"
+	):
+		if not frappe.db.exists(
+			"Working Time", {"employee": employee, "date": today, "docstatus": ("!=", 2)}
+		):
+			frappe.get_doc({"doctype": "Working Time", "employee": employee, "date": today}).insert(
+				ignore_permissions=True
+			)
+
+
 def is_last_working_day(d: date, absent_days: list[date]) -> bool:
 	"""Check if a date is the last working day of the month.
 
@@ -119,6 +135,10 @@ def send_stale_reminders(cutoff_days: int = 3):
 	This method is called every day. If an employee has a draft working time entry
 	that is older than 3 days, it sends a reminder to submit it.
 	"""
+	settings = frappe.get_single("Working Time Settings")
+	if not settings.send_reminders:
+		return
+	cutoff_days = int(settings.submission_deadline_days or cutoff_days)
 	today = date.today()
 	for working_time, employee in frappe.get_all(
 		"Working Time",

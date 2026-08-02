@@ -14,6 +14,9 @@
   "section_break_5",
   "project",
   "task",
+  "helpdesk_ticket",
+  "customer_description",
+  "internal_note",
   "note",
   "section_break_9",
   "is_break"
@@ -27,7 +30,7 @@
    "hide_seconds": 1,
    "in_list_view": 1,
    "label": "Duration",
-   "read_only": 1
+   "description": "Enter the duration directly for new entries."
   },
   {
    "columns": 1,
@@ -43,15 +46,25 @@
    "fieldtype": "Time",
    "in_list_view": 1,
    "label": "From",
-   "reqd": 1
+   "hidden": 1
   },
   {
    "columns": 1,
    "fieldname": "to_time",
    "fieldtype": "Time",
    "in_list_view": 1,
-   "label": "To"
+   "label": "To",
+   "hidden": 1
   },
+  {
+   "fieldname": "helpdesk_ticket",
+   "fieldtype": "Link",
+   "label": "Helpdesk Ticket",
+   "options": "HD Ticket",
+   "read_only": 1
+  },
+  {"fieldname": "customer_description", "fieldtype": "Small Text", "in_list_view": 1, "label": "Customer Description"},
+  {"fieldname": "internal_note", "fieldtype": "Small Text", "label": "Internal Note"},
   {
    "columns": 1,
    "default": "0",
@@ -85,7 +98,9 @@
    "fieldname": "note",
    "fieldtype": "Small Text",
    "in_list_view": 1,
-   "label": "Note"
+   "label": "Legacy Note",
+   "read_only": 1,
+   "hidden": 1
   },
   {
    "fieldname": "task",

@@ -58,10 +58,13 @@ sed -i 's/redis_socketio:/# redis_socketio:/g' Procfile
 
 run_as_runner "cd ~/frappe-bench && bench get-app erpnext --branch version-16"
 run_as_runner "cd ~/frappe-bench && bench get-app hrms --branch version-16"
+run_as_runner "cd ~/frappe-bench && bench get-app telephony https://github.com/frappe/telephony.git --branch develop"
+run_as_runner "cd ~/frappe-bench && bench get-app helpdesk https://github.com/frappe/helpdesk.git --branch v1.28.1"
 run_as_runner "cd ~/frappe-bench && bench get-app working_time \"$WORKSPACE\""
 
 run_as_runner "cd ~/frappe-bench && bench start &> bench_start.log &"
 run_as_runner "cd ~/frappe-bench && bench new-site --db-host $MYSQL_HOST --db-root-password root --admin-password admin test_site --install-app erpnext"
 run_as_runner "cd ~/frappe-bench && bench --site test_site install-app hrms"
+run_as_runner "cd ~/frappe-bench && bench --site test_site install-app helpdesk"
 run_as_runner "cd ~/frappe-bench && bench --site test_site install-app working_time"
 run_as_runner "cd ~/frappe-bench && bench setup requirements --dev"

@@ -19,11 +19,13 @@ OBSOLETE_CUSTOM_FIELDS = {
 def after_install():
 	make_custom_fields()
 	insert_docs()
+	install_helpdesk_form_script()
 	update_projects_settings()
 
 
 def after_migrate():
 	make_custom_fields()
+	install_helpdesk_form_script()
 
 
 def make_custom_fields():
@@ -61,6 +63,33 @@ def insert_docs():
 
 		if not frappe.db.exists(filters):
 			frappe.get_doc(doc).insert(ignore_if_duplicate=True)
+
+
+def install_helpdesk_form_script():
+	if not frappe.db.exists("DocType", "HD Form Script"):
+		return
+	name = "Working Time - Book Ticket Time"
+	script = """function setupForm({ doc, router }) {
+  return {
+    actions: [{
+      label: "Zeit buchen",
+      onClick: () => { window.location.href = `/app/working-time-quick-entry?ticket=${encodeURIComponent(doc.name)}`; },
+    }],
+  };
+}"""
+	values = {
+		"dt": "HD Ticket",
+		"apply_to": "Form",
+		"enabled": 1,
+		"is_standard": 1,
+		"apply_to_customer_portal": 0,
+		"apply_on_new_page": 0,
+		"script": script,
+	}
+	if frappe.db.exists("HD Form Script", name):
+		frappe.db.set_value("HD Form Script", name, values, update_modified=False)
+	else:
+		frappe.get_doc({"doctype": "HD Form Script", "name": name, **values}).insert(ignore_permissions=True)
 
 
 def update_projects_settings():

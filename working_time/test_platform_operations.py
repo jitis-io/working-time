@@ -110,6 +110,8 @@ class TestPlatformOperations(unittest.TestCase):
 					"timesheet_detail": "ROW-0001",
 					"actual_hours": "0.10",
 					"raw_billable_hours": "0.10",
+					"helpdesk_ticket": "HD-TICKET-0001",
+					"customer_description": "First intervention",
 				},
 				{
 					**base,
@@ -117,6 +119,8 @@ class TestPlatformOperations(unittest.TestCase):
 					"timesheet_detail": "ROW-0002",
 					"actual_hours": "0.10",
 					"raw_billable_hours": "0.10",
+					"helpdesk_ticket": "HD-TICKET-0002",
+					"customer_description": "Second intervention",
 				},
 				{
 					**base,
@@ -136,6 +140,9 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(first["hours"], 0.25)
 		self.assertEqual(first["amount"], 30)
 		self.assertEqual(len(first["sources"]), 2)
+		self.assertIsNone(first["helpdesk_ticket"])
+		self.assertEqual(first["ticket_references"], "HD-TICKET-0001, HD-TICKET-0002")
+		self.assertEqual(first["customer_description"], "First intervention; Second intervention")
 
 	def test_invoice_creation_marks_review_as_draft_created(self):
 		item = FakeDocument(

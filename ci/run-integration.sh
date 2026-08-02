@@ -25,9 +25,11 @@ bench init \
 
 cd "$BENCH_DIR"
 
-bench get-app --branch version-16 erpnext https://github.com/frappe/erpnext.git
-bench get-app --branch version-16 hrms https://github.com/frappe/hrms.git
-bench get-app --soft-link working_time "$APP_DIR"
+bench get-app --skip-assets --branch version-16 erpnext https://github.com/frappe/erpnext.git
+bench get-app --skip-assets --branch version-16 hrms https://github.com/frappe/hrms.git
+bench get-app --skip-assets --branch develop telephony https://github.com/frappe/telephony.git
+bench get-app --skip-assets --branch v1.28.1 helpdesk https://github.com/frappe/helpdesk.git
+bench get-app --skip-assets --soft-link working_time "$APP_DIR"
 bench setup requirements --dev
 
 bench new-site \
@@ -37,6 +39,7 @@ bench new-site \
 	--admin-password admin \
 	--install-app erpnext \
 	--install-app hrms \
+	--install-app helpdesk \
 	"$SITE_NAME"
 
 bench --site "$SITE_NAME" install-app working_time

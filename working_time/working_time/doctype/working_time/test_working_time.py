@@ -9,10 +9,15 @@ from working_time.working_time.doctype.working_time.working_time import (
 	aggregate_time_logs,
 	calculate_hours,
 	get_timesheet_description,
+	time_difference_seconds,
 )
 
 
 class TestWorkingTime(unittest.TestCase):
+	def test_time_difference_supports_regular_and_overnight_days(self):
+		self.assertEqual(time_difference_seconds("08:00", "17:00"), 9 * 60 * 60)
+		self.assertEqual(time_difference_seconds("22:00", "06:00"), 8 * 60 * 60)
+
 	def test_native_task_description(self):
 		self.assertEqual(
 			get_timesheet_description("TASK-0001", ["Customer-visible note"]),
@@ -65,6 +70,15 @@ class TestWorkingTime(unittest.TestCase):
 				billable="100%",
 				note="+Customer Note 1",  # Duplicate, should be ignored
 			),
+			_dict(
+				project="Project B",
+				task="Task B",
+				duration=900,
+				billable="0%",
+				customer_description="Explicit customer text",
+				internal_note="Explicit internal text",
+				note=None,
+			),
 		]
 
 		result = aggregate_time_logs(logs)
@@ -79,6 +93,6 @@ class TestWorkingTime(unittest.TestCase):
 
 		# Check Project B
 		project_b = result[("Project B", "Task B")]
-		self.assertEqual(project_b["hours"], 2.0)
-		self.assertEqual(project_b["internal_notes"], [])
-		self.assertEqual(project_b["customer_notes"], ["Customer Note 1"])
+		self.assertEqual(project_b["hours"], 2.25)
+		self.assertEqual(project_b["internal_notes"], ["Explicit internal text"])
+		self.assertEqual(project_b["customer_notes"], ["Customer Note 1", "Explicit customer text"])

@@ -1,5 +1,15 @@
 # Working Time migrations
 
+## 1.3.0 — unified Working Time and Helpdesk booking
+
+1. Take and verify a database backup. Ensure Helpdesk 1.28.1 and Telephony are installed.
+2. Run `bench --site <site> migrate`. The patch aborts before cleanup if a Project has conflicting native/legacy Sales Orders or if scripts/reports still reference the retired ALYF Task fields.
+3. Run `bench build --app working_time` and `bench restart`.
+4. Confirm all historical Working Time counts and submitted raw durations are unchanged. Check that no `Project-source_sales_order`, `Task-custom_is_active` or `Task-custom_hourly_billed` Custom Field remains.
+5. Configure **Working Time Settings**, Employee user mappings, Project billing models, native Sales Orders and hourly rates.
+6. Smoke-test: internal Helpdesk ticket → **Zeit buchen** → daily Working Time → complete allocation → submit → submitted Timesheet → Billing Review → draft Sales Invoice.
+7. Verify a customer project mismatch, wrong Task, missing Employee mapping and customer-portal booking attempt are rejected.
+
 ## 1.2.0 — native ERPNext work and billing model
 
 1. Back up the ERPNext site and verify that the backup can be read before deployment.

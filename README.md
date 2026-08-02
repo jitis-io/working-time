@@ -6,12 +6,14 @@ Teams that use ERPNext Projects and Tasks as the single work-management and bill
 
 ## Features
 
-- Allows logging of miscellanous time, project time and breaks
+- Provides one complete daily form with start, end, required/indicated break and unallocated time
+- Books duration-first entries against Projects, Tasks and Helpdesk Tickets
+- Keeps customer-facing descriptions separate from internal notes
 - Allows to set a percentage of working time as billable time in a Working Time Log
 - Preserves actual and raw billable time without rounding
 - Rounds billable time upward to 15-minute increments only after daily customer/project/task aggregation
 - Uses ERPNext Tasks and local customer notes for Timesheet descriptions
-- Creates ERPNext **Timesheets**
+- Creates and submits one ERPNext **Timesheet** per employee/day/project after the complete day is validated
 - Creates ERPNext **Attendances**
 - Report of actual vs. expected working time per Employee
 - Sends email reminders to employees for submitting their draft working time entries
@@ -42,9 +44,9 @@ Teams that use ERPNext Projects and Tasks as the single work-management and bill
 - Create ERPNext **Tasks** for traceable customer and internal work
 - Create **Activity Cost** records for your **Employees** (_Activity Type_: "Default")
 - Create your first **Working Time**
-    - Add a time log with description,
-    - Add a time log and mark it as a break,
-    - Add a time log and link it to a _Project_ and _Task_
+    - Enter start, end and break,
+    - distribute the complete net duration across Projects, Tasks or Helpdesk Tickets,
+    - add a customer description and an internal note where useful
 - Submit your **Working Time**
 
 ## Further Reading
@@ -71,6 +73,17 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
 - New Working Time submissions preserve raw actual and raw billable hours. Billing Review aggregates billable time by customer, project, task and work date and then rounds the aggregate upward to 15 minutes.
 - Creating Sales Invoices leaves the review and its rows at **Draft Created**. Review and submit the invoices manually, then use **Finalize submitted invoices** to mark the review **Invoiced**.
 - The migration reclassifies old reviews whose linked Sales Invoices are still drafts. It deliberately does not rewrite historical Timesheet rows: values created by the previous five-minute rounding remain historical records. Correct submitted history only through the normal ERPNext cancellation/amendment process with an audit trail.
+
+## Upgrade to 1.3.0
+
+- Helpdesk 1.28.1 and Telephony are required apps. The internal ticket action **Zeit buchen** opens the duration-only quick-entry page; it is not exposed in the customer portal.
+- Projects use native `Project.sales_order` and the explicit billing models Non-billable, Time and Material, Fixed Price and Recurring. Billing Review accepts only T&M projects with a submitted Sales Order and positive hourly rate.
+- The migration conflict-checks `source_sales_order`, derives workday fields without rewriting submitted log durations, migrates draft notes and removes the retired fields only after a reference preflight.
+- Billing Review still rounds once per customer/project/task/day. Ticket boundaries never create additional rounding.
+
+### ALYF attribution
+
+The daily-form interaction was informed by ALYF GmbH's MIT-licensed `time_capture` project. Its ideas for start/end/break, unallocated time and duration distribution were adapted to this app's v16 data and billing model. `time_capture` itself is not installed or used as a second source of truth. Copyright remains with ALYF GmbH and its contributors.
 
 ## License
 

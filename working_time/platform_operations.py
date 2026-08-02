@@ -234,7 +234,7 @@ def confirm_customer_project_provisioning(provisioning_name: str) -> dict[str, s
 
 
 def _ensure_erpnext_project(provisioning: Any, sales_order: Any) -> str:
-	existing = frappe.db.get_value("Project", {"source_sales_order": sales_order.name}, "name")
+	existing = frappe.db.get_value("Project", {"sales_order": sales_order.name}, "name")
 	if existing:
 		return existing
 	project = frappe.get_doc(
@@ -242,7 +242,8 @@ def _ensure_erpnext_project(provisioning: Any, sales_order: Any) -> str:
 			"doctype": "Project",
 			"project_name": _sales_order_project_name(sales_order),
 			"customer": sales_order.customer,
-			"source_sales_order": sales_order.name,
+			"sales_order": sales_order.name,
+			"billing_model": "Time and Material",
 		}
 	)
 	project.insert(ignore_permissions=True)
@@ -347,7 +348,11 @@ def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, 
 	project = frappe.get_doc("Project", project_name)
 	if not project.customer:
 		return "Missing Customer", {"project": project}
-	sales_order = project.get("source_sales_order")
+	if project.get("billing_model") != "Time and Material":
+		return "Locked", {"project": project}
+	if float(project.get("billing_rate") or 0) <= 0:
+		return "Locked", {"project": project}
+	sales_order = project.get("sales_order")
 	if not sales_order or not frappe.db.exists("Sales Order", {"name": sales_order, "docstatus": 1}):
 		return "Missing Sales Order", {"project": project}
 	claimed_status = claimed_sources.get(str(detail.name))
@@ -377,6 +382,8 @@ def _aggregate_billing_sources(sources: list[dict[str, Any]]) -> list[dict[str, 
 			{
 				"timesheet": source["timesheet"],
 				"timesheet_detail": source["timesheet_detail"],
+				"helpdesk_ticket": source.get("helpdesk_ticket"),
+				"customer_description": source.get("customer_description"),
 			}
 		)
 
@@ -389,6 +396,17 @@ def _aggregate_billing_sources(sources: list[dict[str, Any]]) -> list[dict[str, 
 		group["raw_billable_hours"] = float(raw_billable_hours)
 		group["hours"] = _round_billable_hours(raw_billable_hours)
 		group["amount"] = group["hours"] * float(group["rate"] or 0)
+		tickets = sorted(
+			{source["helpdesk_ticket"] for source in group["sources"] if source.get("helpdesk_ticket")}
+		)
+		descriptions = []
+		for source in group["sources"]:
+			description = source.get("customer_description")
+			if description and description not in descriptions:
+				descriptions.append(description)
+		group["helpdesk_ticket"] = tickets[0] if len(tickets) == 1 else None
+		group["ticket_references"] = ", ".join(tickets)
+		group["customer_description"] = "; ".join(descriptions)
 		result.append(group)
 	return result
 
@@ -404,6 +422,8 @@ def _billing_source(detail: Any, timesheet: Any, status: str, context: dict[str,
 		"customer": project.customer if project else None,
 		"project": project.name if project else detail.get("project"),
 		"task": detail.get("task"),
+		"helpdesk_ticket": detail.get("helpdesk_ticket"),
+		"customer_description": detail.get("customer_description") or detail.get("description"),
 		"sales_order": context.get("sales_order"),
 		"work_date": _billing_date(detail, timesheet),
 		"actual_hours": float(detail.get("hours") or 0),
@@ -490,10 +510,32 @@ def create_billing_review(period_start: str, period_end: str) -> dict[str, Any]:
 
 
 def _invoice_description(item: Any) -> str:
-	parts = [f"Service time on {item.work_date}", f"project {item.project}"]
+	parts = [f"Leistungszeit am {item.work_date}", f"Projekt {item.project}"]
 	if item.task:
-		parts.append(f"task {item.task}")
+		parts.append(f"Aufgabe {item.task}")
+	ticket_references = _document_value(item, "ticket_references")
+	customer_description = _document_value(item, "customer_description")
+	if ticket_references:
+		parts.append(f"Ticket {ticket_references}")
+	if customer_description:
+		parts.append(customer_description)
 	return " — ".join(parts)
+
+
+def assert_timesheet_unclaimed(timesheet: Any) -> None:
+	claimed = {}
+	for item in frappe.get_all(
+		"Billing Review Item", fields=["timesheet_detail", "source_details_json", "status"]
+	):
+		for source in _billing_source_references(item):
+			claimed[source] = item.status
+	conflicts = [detail.name for detail in timesheet.time_logs if str(detail.name) in claimed]
+	if conflicts:
+		frappe.throw(
+			_("Working time can no longer be changed because billing already references: {0}").format(
+				", ".join(conflicts)
+			)
+		)
 
 
 @frappe.whitelist()

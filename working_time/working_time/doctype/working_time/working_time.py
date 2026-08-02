@@ -1,7 +1,7 @@
 # Copyright (c) 2023, ALYF GmbH and contributors
 # For license information, please see license.txt
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import frappe
 from frappe import _
@@ -22,35 +22,52 @@ class WorkingTime(Document):
 		self.break_time = self.working_time = self.project_time = self.billable_time = 0
 		self.project_pct = self.billable_pct = 0
 
-		last_idx = len(self.time_logs) - 1
-		for idx, log in enumerate(self.time_logs):
-			log.to_time = self.time_logs[idx + 1].from_time if idx < last_idx else log.to_time
+		for log in self.time_logs:
 			log.cleanup_and_set_duration()
 			log.duration = log.duration or 0
+			migrate_legacy_note(log)
+			apply_project_billing_policy(log)
 			self.break_time += log.duration if log.is_break else 0
-			self.working_time += 0 if log.is_break else log.duration
 			if log.project and not log.is_break:
 				self.project_time += log.duration
 				self.billable_time += get_billable_duration(log)
+
+		if self.check_in and self.check_out:
+			gross = time_difference_seconds(self.check_in, self.check_out)
+			self.break_time = float(self.indicated_break or 0)
+			self.working_time = max(gross - self.break_time, 0)
+		else:
+			self.working_time = sum(float(log.duration or 0) for log in self.time_logs if not log.is_break)
+		self.mandatory_break = get_mandatory_break(self.employee, self.working_time)
+		self.unallocated_time = self.working_time - self.project_time
 
 		if self.working_time:
 			self.project_pct = round(self.project_time / self.working_time * 100, 0)
 			self.billable_pct = round(self.billable_time / self.working_time * 100, 0)
 
 	def validate(self):
+		duplicate = frappe.db.exists(
+			"Working Time",
+			{"employee": self.employee, "date": self.date, "docstatus": ("!=", 2), "name": ("!=", self.name)},
+		)
+		if duplicate:
+			frappe.throw(_("Working Time {0} already exists for this employee and date.").format(duplicate))
+
 		for log in self.time_logs:
 			if log.duration and log.duration < 0:
 				frappe.throw(_("Please fix negative duration in row {0}").format(log.idx))
 
-			if (
-				log.billable != "0%"
-				and log.project
-				and not log.task
-				and (not log.note or not log.note.strip().startswith("+"))
-			):
-				frappe.throw(
-					_("Please add a task or customer invoice note to the billable row {0}").format(log.idx)
-				)
+			validate_log_links(log)
+
+		if self.docstatus == DocStatus.submitted():
+			if not self.check_in or not self.check_out:
+				frappe.throw(_("Start and end are required before submission."))
+			if float(self.indicated_break or 0) < float(self.mandatory_break or 0):
+				frappe.throw(_("The indicated break is shorter than the required break."))
+			if abs(float(self.unallocated_time or 0)) > 1:
+				frappe.throw(_("The complete net working time must be allocated before submission."))
+			if any(not log.project for log in self.time_logs if log.duration and not log.is_break):
+				frappe.throw(_("Every time entry requires a project before submission."))
 
 		self.validate_working_time_policy()
 
@@ -195,48 +212,71 @@ class WorkingTime(Document):
 			attendance.submit()
 
 	def create_timesheets(self):
-		aggregated_time_logs = aggregate_time_logs(self.time_logs)
+		logs_by_project = {}
+		for log in self.time_logs:
+			if log.duration and log.project and not log.is_break:
+				logs_by_project.setdefault(log.project, []).append(log)
 
-		for (project, task), data in aggregated_time_logs.items():
+		for project, logs in logs_by_project.items():
 			costing_rate = get_costing_rate(self.employee)
-			customer, billing_rate = frappe.get_value(
+			customer, billing_rate = frappe.db.get_value(
 				"Project",
 				project,
 				["customer", "billing_rate"],
 			)
+			cursor = datetime.combine(getdate(self.date), get_time(self.check_in))
+			details = []
+			for log in logs:
+				hours, billable_hours = calculate_hours(log)
+				end = cursor + timedelta(seconds=float(log.duration or 0))
+				details.append(
+					{
+						"is_billable": int(billable_hours > 0),
+						"project": project,
+						"task": log.task,
+						"helpdesk_ticket": log.helpdesk_ticket,
+						"activity_type": "Default",
+						"base_billing_rate": billing_rate,
+						"base_costing_rate": costing_rate,
+						"costing_rate": costing_rate,
+						"billing_rate": billing_rate,
+						"hours": hours,
+						"from_time": cursor,
+						"to_time": end,
+						"billing_hours": billable_hours,
+						"description": get_timesheet_description(
+							log.task, [log.customer_description] if log.customer_description else []
+						),
+						"customer_description": log.customer_description,
+						"internal_note": log.internal_note,
+					}
+				)
+				cursor = end
 
-			frappe.get_doc(
+			timesheet = frappe.get_doc(
 				{
 					"doctype": "Timesheet",
-					"time_logs": [
-						{
-							"is_billable": int(data["billable_hours"] > 0),
-							"project": project,
-							"task": task,
-							"activity_type": "Default",
-							"base_billing_rate": billing_rate,
-							"base_costing_rate": costing_rate,
-							"costing_rate": costing_rate,
-							"billing_rate": billing_rate,
-							"hours": data["hours"],
-							"from_time": self.date,
-							"billing_hours": data["billable_hours"],
-							"description": get_timesheet_description(task, data["customer_notes"]),
-						}
-					],
-					"note": ",\n".join(data["internal_notes"]),
+					"time_logs": details,
 					"parent_project": project,
 					"customer": customer,
 					"employee": self.employee,
 					"working_time": self.name,
 				}
-			).insert()
+			).insert(ignore_permissions=True)
+			timesheet.submit()
 
 	def delete_draft_timesheets(self):
 		for timesheet in frappe.get_list(
-			"Timesheet", filters={"working_time": self.name, "docstatus": DocStatus.draft()}
+			"Timesheet", filters={"working_time": self.name, "docstatus": ("!=", DocStatus.cancelled())}
 		):
-			frappe.delete_doc("Timesheet", timesheet.name)
+			doc = frappe.get_doc("Timesheet", timesheet.name)
+			from working_time.platform_operations import assert_timesheet_unclaimed
+
+			assert_timesheet_unclaimed(doc)
+			if doc.docstatus == DocStatus.submitted():
+				doc.cancel()
+			else:
+				frappe.delete_doc("Timesheet", doc.name)
 
 	def cancel_attendance(self):
 		if frappe.has_permission("Attendance", "cancel"):
@@ -267,6 +307,55 @@ def get_billable_duration(log):
 		return 0
 
 	return log.duration * float(log.billable.rstrip("% ")) / 100
+
+
+def time_difference_seconds(start, end) -> float:
+	start_value = get_time(start)
+	end_value = get_time(end)
+	seconds = (
+		datetime.combine(getdate(), end_value) - datetime.combine(getdate(), start_value)
+	).total_seconds()
+	return seconds if seconds >= 0 else seconds + 24 * ONE_HOUR
+
+
+def get_mandatory_break(employee: str, working_seconds: float) -> float:
+	policy_name = frappe.db.get_value("Employee", employee, "working_time_policy") if employee else None
+	if not policy_name:
+		return 0
+	policy = frappe.get_doc("Working Time Policy", policy_name)
+	required = 0
+	for row in policy.mandatory_breaks or []:
+		if working_seconds >= float(row.work_threshold or 0):
+			required = max(required, float(row.required_break_minutes or 0))
+	return required
+
+
+def migrate_legacy_note(log) -> None:
+	if (log.customer_description or log.internal_note) or not log.note:
+		return
+	log.customer_description, log.internal_note = parse_note(log.note)
+
+
+def apply_project_billing_policy(log) -> None:
+	if not log.project:
+		log.billable = "0%"
+		return
+	project_type, billing_model = frappe.db.get_value(
+		"Project", log.project, ["project_type", "billing_model"]
+	) or (None, None)
+	if project_type == "Internal" or billing_model != "Time and Material":
+		log.billable = "0%"
+	elif not log.billable:
+		log.billable = "100%"
+
+
+def validate_log_links(log) -> None:
+	if log.task and frappe.db.get_value("Task", log.task, "project") != log.project:
+		frappe.throw(_("Task in row {0} does not belong to the selected project.").format(log.idx))
+	if log.helpdesk_ticket:
+		from working_time.helpdesk import validate_ticket_booking
+
+		validate_ticket_booking(log.helpdesk_ticket, log.project, log.task)
 
 
 def parse_note(note: str | None) -> tuple[str | None, str | None]:
@@ -319,7 +408,11 @@ def aggregate_time_logs(time_logs) -> dict[tuple[str | None, str | None], dict]:
 	for log in time_logs:
 		if log.duration and log.project:
 			hours, billing_hours = calculate_hours(log)
-			customer_note, internal_note = parse_note(log.note)
+			customer_note, internal_note = (
+				(log.get("customer_description"), log.get("internal_note"))
+				if log.get("customer_description") or log.get("internal_note")
+				else parse_note(log.note)
+			)
 
 			if (log.project, log.task) in aggregated_time_logs:
 				aggregated_time_logs[(log.project, log.task)]["hours"] += hours

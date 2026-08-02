@@ -68,26 +68,12 @@ frappe.ui.form.on("Working Time", {
 });
 
 frappe.ui.form.on("Working Time Log", {
-	time_logs_add: function (frm, cdt, cdn) {
-		let prev_to_time;
-		if (frm.doc.time_logs.length > 1) {
-			prev_to_time = frm.doc.time_logs.at(-2).to_time;
-		}
-		frappe.model.set_value(
-			cdt,
-			cdn,
-			"from_time",
-			prev_to_time || frappe.datetime.now_time(false)
-		);
-		frappe.model.set_value(cdt, cdn, "to_time", ""); // Otherwise Frappe may overwrite empty values with the current time on save.
-	},
 	project: function (frm, cdt, cdn) {
-		// set billable time to 0% if Project is of Type "Internal", reset to 100% otherwise
 		const child = locals[cdt][cdn];
 		frappe.db
-			.get_value("Project", child.project, ["project_type"])
+			.get_value("Project", child.project, ["project_type", "billing_model"])
 			.then(({ message }) => {
-				if (message && message.project_type == "Internal") {
+				if (message && (message.project_type === "Internal" || message.billing_model !== "Time and Material")) {
 					frappe.model.set_value(cdt, cdn, "billable", "0%");
 				} else {
 					frappe.model.set_value(cdt, cdn, "billable", "100%");

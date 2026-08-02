@@ -6,6 +6,7 @@ app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "hallo@alyf.de"
 app_license = "-"
+required_apps = ["erpnext", "hrms", "helpdesk"]
 
 # Includes in <head>
 # ------------------
@@ -111,6 +112,7 @@ scheduler_events = {
 	# 		"working_time.tasks.all"
 	# 	],
 	"daily": [
+		"working_time.reminders.create_daily_drafts",
 		"working_time.reminders.send_stale_reminders",
 		"working_time.reminders.send_month_end_reminders",
 	],
@@ -187,13 +189,12 @@ ignore_translatable_strings_from = ["frappe", "erpnext", "hrms"]
 working_time_custom_fields = {
 	"Project": [
 		{
-			"fieldname": "source_sales_order",
-			"label": "Source Sales Order",
-			"fieldtype": "Link",
-			"options": "Sales Order",
-			"insert_after": "customer",
-			"read_only": 1,
-			"translatable": 0,
+			"fieldname": "billing_model",
+			"label": "Billing Model",
+			"fieldtype": "Select",
+			"options": "Non-billable\nTime and Material\nFixed Price\nRecurring",
+			"default": "Non-billable",
+			"insert_after": "project_type",
 		},
 		{
 			"fieldname": "billing_rate",
@@ -213,6 +214,46 @@ working_time_custom_fields = {
 			"insert_after": "project",
 			"translatable": 0,
 			"read_only": 1,
+		},
+	],
+	"Timesheet Detail": [
+		{
+			"fieldname": "helpdesk_ticket",
+			"label": "Helpdesk Ticket",
+			"fieldtype": "Link",
+			"options": "HD Ticket",
+			"insert_after": "task",
+			"read_only": 1,
+		},
+		{
+			"fieldname": "customer_description",
+			"label": "Customer Description",
+			"fieldtype": "Small Text",
+			"insert_after": "description",
+			"read_only": 1,
+		},
+		{
+			"fieldname": "internal_note",
+			"label": "Internal Note",
+			"fieldtype": "Small Text",
+			"insert_after": "customer_description",
+			"read_only": 1,
+		},
+	],
+	"HD Ticket": [
+		{
+			"fieldname": "erpnext_project",
+			"label": "ERPNext Project",
+			"fieldtype": "Link",
+			"options": "Project",
+			"insert_after": "customer",
+		},
+		{
+			"fieldname": "erpnext_task",
+			"label": "ERPNext Task",
+			"fieldtype": "Link",
+			"options": "Task",
+			"insert_after": "erpnext_project",
 		},
 	],
 	"Attendance": [

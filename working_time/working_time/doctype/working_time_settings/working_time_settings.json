@@ -1,0 +1,13 @@
+{
+ "doctype": "DocType",
+ "issingle": 1,
+ "module": "Working Time",
+ "name": "Working Time Settings",
+ "field_order": ["create_daily_drafts", "submission_deadline_days", "send_reminders"],
+ "fields": [
+  {"fieldname": "create_daily_drafts", "fieldtype": "Check", "label": "Create Daily Drafts", "default": "1"},
+  {"fieldname": "submission_deadline_days", "fieldtype": "Int", "label": "Submission Deadline (Days)", "default": "3"},
+  {"fieldname": "send_reminders", "fieldtype": "Check", "label": "Send Reminders", "default": "1"}
+ ],
+ "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1}]
+}

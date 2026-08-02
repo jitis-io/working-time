@@ -10,8 +10,14 @@
   "employee_name",
   "section_break_4",
   "date",
+  "day_section",
+  "check_in",
+  "check_out",
+  "day_column_break",
+  "indicated_break",
+  "mandatory_break",
+  "unallocated_time",
   "time_logs",
-  "note_explainer",
   "section_break_7",
   "project_time",
   "billable_time",
@@ -67,6 +73,17 @@
    "read_only": 1
   },
   {
+   "fieldname": "day_section",
+   "fieldtype": "Section Break",
+   "label": "Workday"
+  },
+  {"fieldname": "check_in", "fieldtype": "Time", "label": "Start"},
+  {"fieldname": "check_out", "fieldtype": "Time", "label": "End"},
+  {"fieldname": "day_column_break", "fieldtype": "Column Break"},
+  {"fieldname": "indicated_break", "fieldtype": "Duration", "hide_days": 1, "hide_seconds": 1, "label": "Break"},
+  {"fieldname": "mandatory_break", "fieldtype": "Duration", "hide_days": 1, "hide_seconds": 1, "label": "Required Break", "read_only": 1},
+  {"fieldname": "unallocated_time", "fieldtype": "Duration", "hide_days": 1, "hide_seconds": 1, "label": "Unallocated Time", "read_only": 1},
+  {
    "fieldname": "working_time",
    "fieldtype": "Duration",
    "hide_days": 1,
@@ -98,11 +115,6 @@
    "fieldtype": "Duration",
    "label": "Project Time",
    "read_only": 1
-  },
-  {
-   "fieldname": "note_explainer",
-   "fieldtype": "HTML",
-   "options": "<p class=\"text-muted\">Notes starting with <code>\"+ \"</code> will get printed on the invoice, if any.<br>Other notes will be treated as internal.</p><p></p>"
   },
   {
    "fieldname": "billable_time",
