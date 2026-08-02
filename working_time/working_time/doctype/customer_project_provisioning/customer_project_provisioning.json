@@ -8,6 +8,8 @@
  "field_order": [
   "sales_order",
   "customer",
+  "billing_model",
+  "billing_rate",
   "status",
   "erpnext_project",
   "preview_json",
@@ -34,6 +36,20 @@
    "options": "Customer",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "billing_model",
+   "fieldtype": "Select",
+   "label": "Billing Model",
+   "options": "Non-billable\nTime and Material\nFixed Price\nRecurring",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "billing_rate",
+   "fieldtype": "Currency",
+   "label": "Billing Rate per Hour",
+   "read_only": 1
   },
   {
    "fieldname": "status",

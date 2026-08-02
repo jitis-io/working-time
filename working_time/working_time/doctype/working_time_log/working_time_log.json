@@ -91,7 +91,7 @@
    "fieldname": "billable",
    "fieldtype": "Select",
    "label": "Billable",
-   "options": "0%\n25%\n50%\n75%\n100%\n125%\n150%"
+   "options": "0%\n100%"
   },
   {
     "description": "Start with a \"+\" to include this note in billing output; other notes remain internal.",

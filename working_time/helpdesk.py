@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, getdate
 
-from working_time.permissions import get_user_employee
+from working_time.permissions import get_user_employee, require_time_booking_identity
 
 
 def _target_ticket(ticket: str) -> str:
@@ -30,19 +30,25 @@ def _ticket_customer(ticket_doc) -> str | None:
 
 
 def _require_booking_access(ticket: str):
+	require_time_booking_identity()
 	employee = get_user_employee()
 	if not employee:
 		frappe.throw(_("Your user account is not linked to an Employee record."), frappe.PermissionError)
+	doc = _ticket_with_read_access(ticket)
+	return employee, doc
+
+
+def _ticket_with_read_access(ticket: str):
 	ticket = _target_ticket(ticket)
 	doc = frappe.get_doc("HD Ticket", ticket)
 	if not frappe.has_permission("HD Ticket", "read", doc=doc):
 		frappe.throw(_("You are not permitted to read this ticket."), frappe.PermissionError)
-	return employee, doc
+	return doc
 
 
 def validate_ticket_booking(ticket: str, project: str, task: str | None = None) -> None:
-	ticket = _target_ticket(ticket)
-	ticket_doc = frappe.get_doc("HD Ticket", ticket)
+	require_time_booking_identity()
+	ticket_doc = _ticket_with_read_access(ticket)
 	customer = _ticket_customer(ticket_doc)
 	project_doc = frappe.get_doc("Project", project)
 	if customer:

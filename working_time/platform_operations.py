@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from decimal import ROUND_CEILING, Decimal
+from math import isfinite
 from typing import Any
 
 import frappe
@@ -13,6 +14,7 @@ SYNC_QUEUE = "long"
 SYNC_TIMEOUT = 600
 QUARTER_HOUR = Decimal("0.25")
 CLAIMED_BILLING_STATUSES = ("Draft Created", "Invoiced", "Already Invoiced")
+BILLING_MODELS = ("Non-billable", "Time and Material", "Fixed Price", "Recurring")
 
 
 def _now() -> datetime:
@@ -175,11 +177,28 @@ def _sales_order_project_name(sales_order: Any) -> str:
 	return f"{sales_order.customer_name or sales_order.customer} — {sales_order.name}"
 
 
-def _provisioning_preview(sales_order: Any) -> dict[str, Any]:
+def _matching_sales_order_items(sales_order: Any, item_code: str | None) -> list[Any]:
+	if not item_code:
+		return []
+	return [
+		row
+		for row in (_document_value(sales_order, "items", []) or [])
+		if _document_value(row, "item_code") == item_code
+	]
+
+
+def _provisioning_preview(sales_order: Any, time_billing_item: str | None = None) -> dict[str, Any]:
+	time_item_rows = _matching_sales_order_items(sales_order, time_billing_item)
+	time_item_row = time_item_rows[0] if len(time_item_rows) == 1 else None
 	return {
 		"sales_order": sales_order.name,
 		"customer": sales_order.customer,
 		"erpnext_project": _sales_order_project_name(sales_order),
+		"billing_models": list(BILLING_MODELS),
+		"time_billing_item": time_billing_item,
+		"time_billing_item_match_count": len(time_item_rows),
+		"time_billing_item_row": _document_value(time_item_row, "name"),
+		"suggested_billing_rate": float(_document_value(time_item_row, "rate") or 0),
 	}
 
 
@@ -189,9 +208,14 @@ def prepare_customer_project_provisioning(sales_order_name: str) -> dict[str, An
 	sales_order = frappe.get_doc("Sales Order", sales_order_name)
 	if int(sales_order.docstatus or 0) != 1:
 		frappe.throw(_("Project provisioning is only available for submitted Sales Orders."))
+	settings = _settings()
+	preview = _provisioning_preview(sales_order, settings.default_time_billing_item)
 	existing = frappe.db.get_value("Customer Project Provisioning", {"sales_order": sales_order.name}, "name")
 	if existing:
 		doc = frappe.get_doc("Customer Project Provisioning", existing)
+		if doc.status == "Preview":
+			doc.preview_json = _json(preview)
+			doc.save(ignore_permissions=True)
 		return {"name": doc.name, "preview": json.loads(doc.preview_json or "{}"), "status": doc.status}
 	doc = frappe.get_doc(
 		{
@@ -199,7 +223,7 @@ def prepare_customer_project_provisioning(sales_order_name: str) -> dict[str, An
 			"sales_order": sales_order.name,
 			"customer": sales_order.customer,
 			"status": "Preview",
-			"preview_json": _json(_provisioning_preview(sales_order)),
+			"preview_json": _json(preview),
 		}
 	)
 	doc.insert(ignore_permissions=True)
@@ -214,11 +238,45 @@ def prepare_customer_project_provisioning(sales_order_name: str) -> dict[str, An
 
 
 @frappe.whitelist()
-def confirm_customer_project_provisioning(provisioning_name: str) -> dict[str, str]:
+def confirm_customer_project_provisioning(
+	provisioning_name: str,
+	billing_model: str | None = None,
+	billing_rate: float | str | None = None,
+) -> dict[str, str]:
 	_only_system_manager()
 	doc = frappe.get_doc("Customer Project Provisioning", provisioning_name)
 	if doc.status not in {"Preview", "Failed"}:
 		frappe.throw(_("Only a preview or failed provisioning can be confirmed."))
+	selected_model = str(billing_model or doc.get("billing_model") or "").strip()
+	if selected_model not in BILLING_MODELS:
+		frappe.throw(_("Select a valid billing model before provisioning the project."))
+	rate_value = billing_rate if billing_rate is not None else doc.get("billing_rate")
+	try:
+		selected_rate = float(rate_value or 0)
+	except (TypeError, ValueError):
+		frappe.throw(_("Billing rate must be a number."))
+	if selected_model == "Time and Material":
+		settings = _settings()
+		if not settings.default_time_billing_item:
+			frappe.throw(_("Set Default time billing item in Platform Operations Settings first."))
+		sales_order = frappe.get_doc("Sales Order", doc.sales_order)
+		time_item_row = _sales_order_time_billing_row(sales_order, settings.default_time_billing_item)
+		if not isfinite(selected_rate) or selected_rate <= 0:
+			frappe.throw(_("Time and Material projects require a positive billing rate."))
+		sales_order_rate = float(_document_value(time_item_row, "rate") or 0)
+		if _decimal(selected_rate) != _decimal(sales_order_rate):
+			frappe.throw(
+				_("The project billing rate must equal the Sales Order time item rate ({0}).").format(
+					sales_order_rate
+				)
+			)
+	else:
+		selected_rate = 0
+	doc.billing_model = selected_model
+	doc.billing_rate = selected_rate
+	preview = json.loads(doc.preview_json or "{}")
+	preview.update({"billing_model": selected_model, "billing_rate": selected_rate})
+	doc.preview_json = _json(preview)
 	doc.status = "Queued"
 	doc.error = ""
 	doc.flags.ignore_permissions = True
@@ -234,16 +292,35 @@ def confirm_customer_project_provisioning(provisioning_name: str) -> dict[str, s
 
 
 def _ensure_erpnext_project(provisioning: Any, sales_order: Any) -> str:
-	existing = frappe.db.get_value("Project", {"sales_order": sales_order.name}, "name")
+	existing = frappe.db.get_value(
+		"Project",
+		{"sales_order": sales_order.name},
+		["name", "customer", "billing_model", "billing_rate"],
+		as_dict=True,
+	)
 	if existing:
-		return existing
+		conflicts = []
+		if existing.customer != sales_order.customer:
+			conflicts.append("customer")
+		if existing.billing_model != provisioning.billing_model:
+			conflicts.append("billing model")
+		if _decimal(existing.billing_rate) != _decimal(provisioning.billing_rate):
+			conflicts.append("billing rate")
+		if conflicts:
+			frappe.throw(
+				_("Existing Project {0} conflicts with provisioning for: {1}.").format(
+					existing.name, ", ".join(conflicts)
+				)
+			)
+		return str(existing.name)
 	project = frappe.get_doc(
 		{
 			"doctype": "Project",
 			"project_name": _sales_order_project_name(sales_order),
 			"customer": sales_order.customer,
 			"sales_order": sales_order.name,
-			"billing_model": "Time and Material",
+			"billing_model": provisioning.billing_model,
+			"billing_rate": float(provisioning.billing_rate or 0),
 		}
 	)
 	project.insert(ignore_permissions=True)
@@ -522,6 +599,37 @@ def _invoice_description(item: Any) -> str:
 	return " — ".join(parts)
 
 
+def _sales_order_time_billing_row(sales_order: Any, item_code: str) -> Any:
+	matching_rows = _matching_sales_order_items(sales_order, item_code)
+	if len(matching_rows) != 1:
+		frappe.throw(
+			_("Sales Order {0} must contain exactly one row for time billing item {1}; found {2}.").format(
+				_document_value(sales_order, "name"), item_code, len(matching_rows)
+			)
+		)
+	row_name = _document_value(matching_rows[0], "name")
+	if not row_name:
+		frappe.throw(
+			_("The time billing item row in Sales Order {0} has no stable reference.").format(
+				_document_value(sales_order, "name")
+			)
+		)
+	row = matching_rows[0]
+	if _document_value(row, "uom") != "Hour":
+		frappe.throw(
+			_("The time billing item in Sales Order {0} must use UOM Hour.").format(
+				_document_value(sales_order, "name")
+			)
+		)
+	if _decimal(_document_value(row, "conversion_factor")) != Decimal("1"):
+		frappe.throw(
+			_("The time billing item in Sales Order {0} must use conversion factor 1.").format(
+				_document_value(sales_order, "name")
+			)
+		)
+	return row
+
+
 def assert_timesheet_unclaimed(timesheet: Any) -> None:
 	claimed = {}
 	for item in frappe.get_all(
@@ -563,9 +671,21 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	groups: dict[tuple[str, str], list[Any]] = {}
 	for item in eligible_items:
 		groups.setdefault((item.customer, item.sales_order), []).append(item)
-	invoices: list[str] = []
+	invoice_groups: list[tuple[str, str, list[Any], Any, str]] = []
 	for (customer, sales_order_name), items in groups.items():
 		sales_order = frappe.get_doc("Sales Order", sales_order_name)
+		time_item_row = _sales_order_time_billing_row(sales_order, settings.default_time_billing_item)
+		so_detail = str(_document_value(time_item_row, "name"))
+		sales_order_rate = _decimal(_document_value(time_item_row, "rate"))
+		if any(_decimal(item.rate) != sales_order_rate for item in items):
+			frappe.throw(
+				_("Billing Review rates must equal the Sales Order time item rate for {0}.").format(
+					sales_order_name
+				)
+			)
+		invoice_groups.append((customer, sales_order_name, items, sales_order, so_detail))
+	invoices: list[str] = []
+	for customer, sales_order_name, items, sales_order, so_detail in invoice_groups:
 		invoice = frappe.get_doc(
 			{
 				"doctype": "Sales Invoice",
@@ -579,6 +699,7 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 						"rate": item.rate,
 						"project": item.project,
 						"sales_order": sales_order_name,
+						"so_detail": so_detail,
 						"description": _invoice_description(item),
 					}
 					for item in items

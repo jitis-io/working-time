@@ -25,6 +25,7 @@ def after_install():
 
 def after_migrate():
 	make_custom_fields()
+	insert_docs()
 	install_helpdesk_form_script()
 
 
@@ -50,7 +51,11 @@ def insert_docs():
 		{
 			"doctype": "Activity Type",
 			"activity_type": "Default",
-		}
+		},
+		{
+			"doctype": "Project Type",
+			"project_type": "Internal",
+		},
 	]
 
 	for doc in docs:

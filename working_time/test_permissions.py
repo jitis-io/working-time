@@ -96,6 +96,7 @@ except ModuleNotFoundError:
 
 from working_time.hooks import has_permission, permission_query_conditions
 from working_time.permissions import (
+	TECHNICAL_SERVICE_ROLES,
 	require_employee_access,
 	working_time_has_permission,
 	working_time_query_conditions,
@@ -183,6 +184,37 @@ class TestWorkingTimePermissions(unittest.TestCase):
 					FakeDocument(employee="EMP-9999"), "delete", "manager@example.com"
 				)
 			)
+
+	def test_website_user_is_explicitly_denied(self):
+		with (
+			patch("working_time.permissions.frappe.db.get_value", return_value="Website User"),
+			patch("working_time.permissions.frappe.get_roles", return_value=["System Manager"]),
+		):
+			self.assertEqual(working_time_query_conditions("portal@example.com"), "1=0")
+			self.assertFalse(
+				working_time_has_permission(FakeDocument(employee="EMP-0001"), "write", "portal@example.com")
+			)
+			with self.assertRaises(frappe.PermissionError):
+				require_employee_access("EMP-0001", "portal@example.com")
+
+	def test_technical_service_roles_are_explicitly_denied(self):
+		for service_role in TECHNICAL_SERVICE_ROLES:
+			with (
+				self.subTest(service_role=service_role),
+				patch("working_time.permissions.frappe.db.get_value", return_value="System User"),
+				patch(
+					"working_time.permissions.frappe.get_roles",
+					return_value=["System Manager", service_role],
+				),
+			):
+				self.assertEqual(working_time_query_conditions("service@example.com"), "1=0")
+				self.assertFalse(
+					working_time_has_permission(
+						FakeDocument(employee="EMP-0001"), "write", "service@example.com"
+					)
+				)
+				with self.assertRaises(frappe.PermissionError):
+					require_employee_access("EMP-0001", "service@example.com")
 
 	def test_employee_scope_accepts_own_employee_and_rejects_another(self):
 		with (

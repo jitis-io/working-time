@@ -15,22 +15,27 @@ HALF_DAY = 3.25
 OVERTIME_FACTOR = 1.15
 MAX_HALF_DAY = HALF_DAY * OVERTIME_FACTOR * 60 * 60
 ONE_HOUR = 60 * 60
+VALID_BILLABLE_PERCENTAGES = {"0%": 0, "100%": 1}
 
 
 class WorkingTime(Document):
 	def before_validate(self):
 		self.break_time = self.working_time = self.project_time = self.billable_time = 0
 		self.project_pct = self.billable_pct = 0
+		enforce_billable_percentages = should_enforce_billable_percentages(self)
 
 		for log in self.time_logs:
 			log.cleanup_and_set_duration()
 			log.duration = log.duration or 0
 			migrate_legacy_note(log)
-			apply_project_billing_policy(log)
+			if enforce_billable_percentages:
+				apply_project_billing_policy(log)
 			self.break_time += log.duration if log.is_break else 0
 			if log.project and not log.is_break:
 				self.project_time += log.duration
-				self.billable_time += get_billable_duration(log)
+				self.billable_time += get_billable_duration(
+					log, allow_legacy=not enforce_billable_percentages
+				)
 
 		if self.check_in and self.check_out:
 			gross = time_difference_seconds(self.check_in, self.check_out)
@@ -149,28 +154,38 @@ class WorkingTime(Document):
 				"docstatus": ("!=", 2),
 				"name": ("!=", self.name),
 			},
-			["name", "date"],
+			["name", "date", "check_in", "check_out"],
 			order_by="date desc",
 			as_dict=True,
 		)
 		if not previous:
 			return
 
-		last_to_time = frappe.db.get_value(
+		previous_end = previous.check_out or frappe.db.get_value(
 			"Working Time Log",
 			{"parent": previous.name, "to_time": ("is", "set")},
 			"to_time",
 			order_by="to_time desc",
 		)
-		if not last_to_time:
+		if not previous_end:
+			return
+		previous_start = previous.check_in or frappe.db.get_value(
+			"Working Time Log",
+			{"parent": previous.name, "from_time": ("is", "set")},
+			"from_time",
+			order_by="from_time asc",
+		)
+
+		current_start = self.check_in or next(
+			(log.from_time for log in self.time_logs if log.from_time), None
+		)
+		if not current_start:
 			return
 
-		first_from_time = self.time_logs[0].from_time
-		if not first_from_time:
-			return
-
-		prev_end = datetime.combine(getdate(previous.date), get_time(last_to_time))
-		curr_start = datetime.combine(getdate(self.date), get_time(first_from_time))
+		prev_end = datetime.combine(getdate(previous.date), get_time(previous_end))
+		if previous_start and get_time(previous_end) < get_time(previous_start):
+			prev_end += timedelta(days=1)
+		curr_start = datetime.combine(getdate(self.date), get_time(current_start))
 		rest_seconds = (curr_start - prev_end).total_seconds()
 
 		if rest_seconds < policy.min_rest_between_days:
@@ -212,23 +227,24 @@ class WorkingTime(Document):
 			attendance.submit()
 
 	def create_timesheets(self):
-		logs_by_project = {}
-		for log in self.time_logs:
-			if log.duration and log.project and not log.is_break:
-				logs_by_project.setdefault(log.project, []).append(log)
+		logs_by_project = group_timesheet_logs(
+			self.time_logs,
+			work_date=self.date,
+			check_in=self.check_in,
+			check_out=self.check_out,
+			indicated_break=self.indicated_break,
+		)
 
-		for project, logs in logs_by_project.items():
+		for project, log_intervals in logs_by_project.items():
 			costing_rate = get_costing_rate(self.employee)
 			customer, billing_rate = frappe.db.get_value(
 				"Project",
 				project,
 				["customer", "billing_rate"],
 			)
-			cursor = datetime.combine(getdate(self.date), get_time(self.check_in))
 			details = []
-			for log in logs:
+			for log, start, end in log_intervals:
 				hours, billable_hours = calculate_hours(log)
-				end = cursor + timedelta(seconds=float(log.duration or 0))
 				details.append(
 					{
 						"is_billable": int(billable_hours > 0),
@@ -241,7 +257,7 @@ class WorkingTime(Document):
 						"costing_rate": costing_rate,
 						"billing_rate": billing_rate,
 						"hours": hours,
-						"from_time": cursor,
+						"from_time": start,
 						"to_time": end,
 						"billing_hours": billable_hours,
 						"description": get_timesheet_description(
@@ -251,8 +267,6 @@ class WorkingTime(Document):
 						"internal_note": log.internal_note,
 					}
 				)
-				cursor = end
-
 			timesheet = frappe.get_doc(
 				{
 					"doctype": "Timesheet",
@@ -302,11 +316,72 @@ def get_costing_rate(employee):
 	)
 
 
-def get_billable_duration(log):
-	if log.billable == "0%":
-		return 0
+def group_timesheet_logs(time_logs, *, work_date, check_in, check_out, indicated_break):
+	"""Group rows by project on one break-aware timeline bounded by the workday."""
+	grouped = {}
+	cursor = datetime.combine(getdate(work_date), get_time(check_in))
+	day_end = datetime.combine(getdate(work_date), get_time(check_out))
+	if day_end < cursor:
+		day_end += timedelta(days=1)
+	positive_logs = [log for log in time_logs if float(log.duration or 0) > 0]
+	explicit_break = sum(float(log.duration or 0) for log in positive_logs if log.is_break)
+	indicated_break = max(float(indicated_break or 0), 0)
+	if explicit_break > indicated_break + 1:
+		frappe.throw(_("Explicit break rows exceed the indicated break."))
+	remaining_break = max(indicated_break - explicit_break, 0)
+	work_logs = [log for log in positive_logs if not log.is_break]
+	total_work = sum(float(log.duration or 0) for log in work_logs)
+	cumulative = 0.0
+	break_candidates = []
+	for index, log in enumerate(work_logs):
+		break_candidates.append((abs(cumulative - total_work / 2), index))
+		cumulative += float(log.duration or 0)
+	break_candidates.append((abs(cumulative - total_work / 2), len(work_logs)))
+	break_before_index = (
+		min(break_candidates, key=lambda candidate: (candidate[0], -candidate[1]))[1]
+		if break_candidates
+		else 0
+	)
+	work_index = 0
+	for log in time_logs:
+		duration = float(log.duration or 0)
+		if duration <= 0:
+			continue
+		if not log.is_break and remaining_break and work_index == break_before_index:
+			cursor += timedelta(seconds=remaining_break)
+			remaining_break = 0
+		end = cursor + timedelta(seconds=duration)
+		if end > day_end + timedelta(seconds=1):
+			frappe.throw(_("Timesheet entries may not extend beyond the recorded workday end."))
+		if log.project and not log.is_break:
+			grouped.setdefault(log.project, []).append((log, cursor, end))
+		cursor = end
+		if not log.is_break:
+			work_index += 1
+	if remaining_break:
+		cursor += timedelta(seconds=remaining_break)
+	if cursor > day_end + timedelta(seconds=1):
+		frappe.throw(_("Timesheet entries and breaks may not extend beyond the recorded workday end."))
+	return grouped
 
-	return log.duration * float(log.billable.rstrip("% ")) / 100
+
+def get_billable_duration(log, *, allow_legacy: bool = False):
+	if allow_legacy:
+		try:
+			return float(log.duration or 0) * float(str(log.billable or "0%").rstrip("% ")) / 100
+		except (TypeError, ValueError):
+			return 0
+	validate_billable_percentage(log)
+	return float(log.duration or 0) * VALID_BILLABLE_PERCENTAGES[log.billable]
+
+
+def should_enforce_billable_percentages(document) -> bool:
+	"""Keep submitted history readable while enforcing binary values on drafts and submission."""
+	if int(document.docstatus or 0) != int(DocStatus.submitted()):
+		return True
+	get_before_save = getattr(document, "get_doc_before_save", None)
+	previous = get_before_save() if get_before_save else None
+	return not previous or int(previous.docstatus or 0) != int(DocStatus.submitted())
 
 
 def time_difference_seconds(start, end) -> float:
@@ -347,6 +422,16 @@ def apply_project_billing_policy(log) -> None:
 		log.billable = "0%"
 	elif not log.billable:
 		log.billable = "100%"
+	else:
+		validate_billable_percentage(log)
+
+
+def validate_billable_percentage(log) -> None:
+	if log.billable in VALID_BILLABLE_PERCENTAGES:
+		return
+	if getattr(log, "idx", None):
+		frappe.throw(_("Billable percentage in row {0} must be either 0% or 100%.").format(log.idx))
+	frappe.throw(_("Billable percentage must be either 0% or 100%."))
 
 
 def validate_log_links(log) -> None:

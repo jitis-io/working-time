@@ -10,7 +10,11 @@ frappe.ui.form.on("Customer Project Provisioning", {
 		frm.add_custom_button(__("Retry provisioning"), async () => {
 			await frappe.call({
 				method: "working_time.platform_operations.confirm_customer_project_provisioning",
-				args: { provisioning_name: frm.doc.name },
+				args: {
+					provisioning_name: frm.doc.name,
+					billing_model: frm.doc.billing_model,
+					billing_rate: frm.doc.billing_rate,
+				},
 				freeze: true,
 				freeze_message: __("Queueing provisioning retry…"),
 			});
