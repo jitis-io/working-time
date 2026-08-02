@@ -1,5 +1,10 @@
 # Working Time migrations
 
+## 1.3.1 — upgrade ordering hotfix
+
+- Existing sites now create the v1.3 Project and integration custom fields before the data backfill patch queries them.
+- Fresh installs and sites upgrading from 1.2.1 use the same migration path.
+
 ## 1.3.0 — unified Working Time and Helpdesk booking
 
 1. Take and verify a database backup. Ensure Helpdesk 1.28.1 and Telephony are installed.

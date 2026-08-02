@@ -1,9 +1,14 @@
 import frappe
 
+from working_time.install import make_custom_fields
+
 TASK_FIELDS = ("custom_is_active", "custom_hourly_billed")
 
 
 def execute():
+	# Existing sites have already recorded the older generic custom-field patch.
+	# Create the v1.3 fields explicitly before any backfill queries them.
+	make_custom_fields()
 	migrate_project_sales_orders()
 	backfill_project_billing_models()
 	backfill_workdays()
