@@ -48,6 +48,6 @@ indent-style = "tab"
 docstring-code-format = true
 
 [project.urls]
-Homepage = "https://github.com/alyf-de/working_time"
-Repository = "https://github.com/alyf-de/working_time"
-"Bug Reports" = "https://github.com/alyf-de/working_time/issues"
+Homepage = "https://git.jitis.io/jitis/erpnext/working_time"
+Repository = "https://git.jitis.io/jitis/erpnext/working_time"
+"Bug Reports" = "https://git.jitis.io/jitis/erpnext/working_time/-/issues"

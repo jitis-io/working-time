@@ -29,7 +29,7 @@ Teams that use ERPNext Projects and Tasks as the ongoing work-management and bil
 - Install this app
 
    ```bash
-   bench get-app https://github.com/alyf-de/working_time
+   bench get-app --branch version-16 working_time ssh://git@git-ssh.jitis.io:2222/jitis/erpnext/working_time.git
    bench install-app working_time
    ```
 
