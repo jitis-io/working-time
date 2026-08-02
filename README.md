@@ -2,7 +2,7 @@ Time tracking, attendance and billing review in ERPNext
 
 ## Who is this for?
 
-Teams that use ERPNext Projects and Tasks as the ongoing work-management and billing source. OpenProject remains available only for the controlled final import.
+Teams that use ERPNext Projects and Tasks as the single work-management and billing source.
 
 ## Features
 
@@ -10,7 +10,7 @@ Teams that use ERPNext Projects and Tasks as the ongoing work-management and bil
 - Allows to set a percentage of working time as billable time in a Working Time Log
 - Preserves actual and raw billable time without rounding
 - Rounds billable time upward to 15-minute increments only after daily customer/project/task aggregation
-- Uses ERPNext Tasks and local customer notes for Timesheet descriptions without a runtime OpenProject lookup
+- Uses ERPNext Tasks and local customer notes for Timesheet descriptions
 - Creates ERPNext **Timesheets**
 - Creates ERPNext **Attendances**
 - Report of actual vs. expected working time per Employee
@@ -53,24 +53,19 @@ Want to add pretty time logs to your invoice? Check out our [print formats](http
 
 ## Platform Operations
 
-The Integration Control Center records OpenProject webhook state, reconciliation runs, billing reviews and project provisioning. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Alerts are sent in the Adaptive Card envelope required by the Teams Workflow webhook. Billing creates drafts only.
+The **Platform Operations** workspace groups native ERPNext project provisioning, billing reviews and operational alerts. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Alerts use the Adaptive Card envelope required by Teams Workflow. Billing creates drafts only.
 
-OpenProject reconciliation is intentionally not scheduled. For the controlled final import, open the **OpenProject Site** and use **Queue one-time reconciliation** as a System Manager. Run the required types deliberately and review each result in the Integration Control Center. Do not enable full deletion reconciliation unless the API account can see every source record.
-
-OpenProject webhooks fail closed: requests are rejected when the configured site has no webhook secret. A pull-only final import does not require a webhook secret, but no webhook can be accepted until one is configured.
-
-Project provisioning creates or links only the ERPNext Project after an explicit preview. It no longer creates OpenProject projects. Portal permissions remain owned by the portal.
+Project provisioning creates or links an ERPNext Project after an explicit preview. Portal permissions remain owned by the portal.
 
 Run Docker quality and clean-bench integration checks before committing; see AGENTS.md.
 
-## Upgrade to 1.1.0
+## Upgrade to 1.2.0
 
-Version 1.1.0 is a forward-only transition away from OpenProject as the ongoing work-management source:
+Version 1.2.0 completes the forward-only consolidation on ERPNext:
 
 - Deploy with `bench --site <site> migrate`, `bench build --app working_time`, and `bench restart`.
-- OpenProject webhook requests now require a configured signature secret and otherwise fail closed.
-- Automatic OpenProject reconciliation jobs were removed. If a final import is still required, queue each required reconciliation once from the OpenProject Site and inspect the run before continuing.
-- Sales Order project provisioning creates only ERPNext Projects and never creates new OpenProject projects.
+- The retired external project integration, its DocTypes, credentials, custom fields, jobs, Workspace links and historical integration-control records are removed.
+- Sales Order project provisioning creates ERPNext Projects directly.
 - Working Time access is employee-scoped for list, read, create, write, submit, cancel, delete, amend and
   both reports. System Managers remain unrestricted; users without an Employee mapping are denied.
 - New Working Time submissions preserve raw actual and raw billable hours. Billing Review aggregates billable time by customer, project, task and work date and then rounds the aggregate upward to 15 minutes.

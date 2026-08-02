@@ -8,16 +8,10 @@ OBSOLETE_CUSTOM_FIELDS = {
 	"Customer": [
 		"customer_offboarding",
 	],
-	"Project": [
-		"openproject_section",
-		"openproject_site",
-	],
 	"Timesheet Detail": [
 		"jira_section",
 		"jira",
 		"issue_url",
-		"openproject_section",
-		"openproject_time_entry_url",
 	],
 }
 

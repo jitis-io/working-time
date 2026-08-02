@@ -31,7 +31,6 @@ app_license = "-"
 # include js in doctype views
 doctype_js = {
 	"Sales Order": "public/js/sales_order.js",
-	"OpenProject Webhook Event": "public/js/openproject_webhook_event.js",
 	"Customer Project Provisioning": "public/js/customer_project_provisioning.js",
 	"Billing Review": "public/js/billing_review.js",
 	"Platform Operations Settings": "public/js/platform_operations_settings.js",
@@ -103,15 +102,6 @@ has_permission = {
 # Document Events
 # ---------------
 # Hook on document methods and events
-
-doc_events = {
-	"Project": {
-		"validate": "working_time.openproject_sync.validate_project_mapping_on_save",
-	},
-	"Task": {
-		"validate": "working_time.openproject_sync.validate_task_mapping_on_save",
-	},
-}
 
 # Scheduled Tasks
 # ---------------
@@ -195,25 +185,6 @@ ignore_translatable_strings_from = ["frappe", "erpnext", "hrms"]
 # ]
 
 working_time_custom_fields = {
-	"Timesheet Detail": [
-		{
-			"fieldname": "openproject_work_package_url",
-			"label": "Work Package URL",
-			"fieldtype": "Data",
-			"options": "URL",
-			"insert_after": "costing_amount",
-			"read_only": 1,
-			"translatable": 0,
-		},
-		{
-			"fieldname": "openproject_time_entry_id",
-			"label": "OpenProject Time Entry ID",
-			"fieldtype": "Data",
-			"insert_after": "openproject_work_package_url",
-			"read_only": 1,
-			"translatable": 0,
-		},
-	],
 	"Project": [
 		{
 			"fieldname": "source_sales_order",
@@ -231,46 +202,6 @@ working_time_custom_fields = {
 			"options": "currency",
 			"insert_after": "cost_center",
 			"translatable": 0,
-		},
-		{
-			"fieldname": "openproject_url",
-			"label": "OpenProject URL",
-			"fieldtype": "Data",
-			"options": "URL",
-			"insert_after": "message",
-			"read_only": 1,
-			"translatable": 0,
-		},
-		{
-			"fieldname": "openproject_project_id",
-			"label": "OpenProject Project ID",
-			"fieldtype": "Data",
-			"insert_after": "openproject_url",
-			"translatable": 0,
-			"hidden": 1,
-			"read_only": 1,
-			"description": "OpenProject numeric project ID for traceability.",
-		},
-	],
-	"Task": [
-		{
-			"fieldname": "openproject_url",
-			"label": "OpenProject URL",
-			"fieldtype": "Data",
-			"options": "URL",
-			"insert_after": "description",
-			"read_only": 1,
-			"translatable": 0,
-		},
-		{
-			"fieldname": "openproject_work_package_id",
-			"label": "OpenProject Work Package ID",
-			"fieldtype": "Data",
-			"insert_after": "openproject_url",
-			"translatable": 0,
-			"hidden": 1,
-			"read_only": 1,
-			"description": "OpenProject numeric work package ID for traceability.",
 		},
 	],
 	"Timesheet": [

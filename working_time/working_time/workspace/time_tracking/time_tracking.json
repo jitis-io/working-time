@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"jHdDNNBVht\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Time Tracking</span>\",\"col\":12}},{\"id\":\"ZcUSxBIlWp\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Working Time (this month)\",\"col\":3}},{\"id\":\"zHDznJJ5hl\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Daily Project Time (this month)\",\"col\":3}},{\"id\":\"EZ6oJM8hIh\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Daily Billable Time (this month)\",\"col\":3}},{\"id\":\"4oNn-q9SDa\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Daily Break Time (this month)\",\"col\":3}},{\"id\":\"EJ3-LMFsl5\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"xLRzF4LU5K\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Working Time\",\"col\":3}},{\"id\":\"buciCFI8AT\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"SY-BkpVkkF\",\"type\":\"card\",\"data\":{\"card_name\":\"Time Tracking\",\"col\":3}},{\"id\":\"MR62i3jW2r\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":3}},{\"id\":\"RCFzaHVK_m\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":3}}]",
+ "content": "[{\"id\":\"jHdDNNBVht\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Time Tracking</span>\",\"col\":12}},{\"id\":\"ZcUSxBIlWp\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Working Time (this month)\",\"col\":3}},{\"id\":\"zHDznJJ5hl\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Daily Project Time (this month)\",\"col\":3}},{\"id\":\"EZ6oJM8hIh\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Daily Billable Time (this month)\",\"col\":3}},{\"id\":\"4oNn-q9SDa\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Daily Break Time (this month)\",\"col\":3}},{\"id\":\"EJ3-LMFsl5\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"xLRzF4LU5K\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New Working Time\",\"col\":3}},{\"id\":\"buciCFI8AT\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"SY-BkpVkkF\",\"type\":\"card\",\"data\":{\"card_name\":\"Time Tracking\",\"col\":3}},{\"id\":\"MR62i3jW2r\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":3}}]",
  "creation": "2025-11-28 13:40:18.500058",
  "custom_blocks": [],
  "docstatus": 0,
@@ -50,26 +50,7 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Setup",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-    "label": "OpenProject Site",
-   "link_count": 0,
-    "link_to": "OpenProject Site",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-    }
+  }
  ],
  "modified": "2025-11-28 13:57:09.283009",
  "modified_by": "Administrator",

@@ -14,7 +14,6 @@
   "section_break_5",
   "project",
   "task",
-  "key",
   "note",
   "section_break_9",
   "is_break"
@@ -37,15 +36,6 @@
    "in_list_view": 1,
    "label": "Project",
    "options": "Project"
-  },
-  {
-   "columns": 1,
-   "description": "Read-only reference retained for imported OpenProject history.",
-   "fieldname": "key",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Legacy Work Package ID",
-   "read_only": 1
   },
   {
    "columns": 1,

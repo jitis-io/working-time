@@ -12,12 +12,7 @@ class WorkingTimeLog(Document):
 	def cleanup_and_set_duration(self):
 		self.ensure_timedelta()
 		self.remove_seconds()
-		self.uppercase_key()
 		self.set_duration()
-
-	def uppercase_key(self):
-		if self.key:
-			self.key = self.key.upper()
 
 	def ensure_timedelta(self):
 		if isinstance(self.from_time, str):

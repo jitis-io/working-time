@@ -13,9 +13,9 @@ from working_time.working_time.doctype.working_time.working_time import (
 
 
 class TestWorkingTime(unittest.TestCase):
-	def test_native_task_description_does_not_require_openproject(self):
+	def test_native_task_description(self):
 		self.assertEqual(
-			get_timesheet_description("TASK-0001", None, ["Customer-visible note"]),
+			get_timesheet_description("TASK-0001", ["Customer-visible note"]),
 			"TASK-0001: Customer-visible note",
 		)
 
@@ -29,35 +29,30 @@ class TestWorkingTime(unittest.TestCase):
 		logs = [
 			_dict(
 				project="Project A",
-				key="KEY-1",
 				duration=3600,
 				billable="100%",
 				note="Internal Note 1",
 			),
 			_dict(
 				project="Project A",
-				key="KEY-1",
 				duration=1800,
 				billable="100%",
 				note="Internal Note 2",
 			),
 			_dict(
 				project="Project A",
-				key="KEY-1",
 				duration=1800,
 				billable="100%",
 				note="Internal Note 2",  # Duplicate, should be ignored
 			),
 			_dict(
 				project="Project A",
-				key="KEY-1",
 				duration=3600,
 				billable="100%",
 				note="Internal Note 1",  # Not consecutive, should be added
 			),
 			_dict(
 				project="Project B",
-				key="KEY-2",
 				task="Task B",
 				duration=3600,
 				billable="100%",
@@ -65,7 +60,6 @@ class TestWorkingTime(unittest.TestCase):
 			),
 			_dict(
 				project="Project B",
-				key="KEY-2",
 				task="Task B",
 				duration=3600,
 				billable="100%",
@@ -76,7 +70,7 @@ class TestWorkingTime(unittest.TestCase):
 		result = aggregate_time_logs(logs)
 
 		# Check Project A
-		project_a = result[("Project A", None, "KEY-1")]
+		project_a = result[("Project A", None)]
 		self.assertEqual(project_a["hours"], 3.0)
 		self.assertEqual(
 			project_a["internal_notes"], ["Internal Note 1", "Internal Note 2", "Internal Note 1"]
@@ -84,7 +78,7 @@ class TestWorkingTime(unittest.TestCase):
 		self.assertEqual(project_a["customer_notes"], [])
 
 		# Check Project B
-		project_b = result[("Project B", "Task B", "KEY-2")]
+		project_b = result[("Project B", "Task B")]
 		self.assertEqual(project_b["hours"], 2.0)
 		self.assertEqual(project_b["internal_notes"], [])
 		self.assertEqual(project_b["customer_notes"], ["Customer Note 1"])

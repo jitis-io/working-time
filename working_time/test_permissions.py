@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 if "frappe" not in sys.modules:
-	from working_time.test_openproject_sync import _bootstrap_frappe_stub
+	from working_time.test_platform_operations import _bootstrap_frappe_stub
 
 	_bootstrap_frappe_stub()
 

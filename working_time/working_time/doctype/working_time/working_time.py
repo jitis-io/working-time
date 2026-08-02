@@ -46,7 +46,6 @@ class WorkingTime(Document):
 				log.billable != "0%"
 				and log.project
 				and not log.task
-				and not log.key
 				and (not log.note or not log.note.strip().startswith("+"))
 			):
 				frappe.throw(
@@ -198,7 +197,7 @@ class WorkingTime(Document):
 	def create_timesheets(self):
 		aggregated_time_logs = aggregate_time_logs(self.time_logs)
 
-		for (project, task, key), data in aggregated_time_logs.items():
+		for (project, task), data in aggregated_time_logs.items():
 			costing_rate = get_costing_rate(self.employee)
 			customer, billing_rate = frappe.get_value(
 				"Project",
@@ -222,7 +221,7 @@ class WorkingTime(Document):
 							"hours": data["hours"],
 							"from_time": self.date,
 							"billing_hours": data["billable_hours"],
-							"description": get_timesheet_description(task, key, data["customer_notes"]),
+							"description": get_timesheet_description(task, data["customer_notes"]),
 						}
 					],
 					"note": ",\n".join(data["internal_notes"]),
@@ -284,13 +283,11 @@ def parse_note(note: str | None) -> tuple[str | None, str | None]:
 	return customer_note, internal_note
 
 
-def get_timesheet_description(task: str | None, legacy_key: str | None, customer_notes: list[str]) -> str:
-	"""Build a local Timesheet description without an OpenProject API lookup."""
+def get_timesheet_description(task: str | None, customer_notes: list[str]) -> str:
+	"""Build a local Timesheet description from the native task and notes."""
 	parts: list[str] = []
 	if task:
 		parts.append(str(task))
-	elif legacy_key:
-		parts.append(_("Legacy work package {0}").format(legacy_key))
 	if customer_notes:
 		parts.append("; ".join(customer_notes))
 	return ": ".join(parts) or "-"
@@ -308,10 +305,10 @@ def calculate_hours(log) -> tuple[float, float]:
 	return hours, billing_hours
 
 
-def aggregate_time_logs(time_logs) -> dict[tuple[str | None, str | None, str | None], dict]:
-	"""Aggregate time logs by project and work package ID."""
+def aggregate_time_logs(time_logs) -> dict[tuple[str | None, str | None], dict]:
+	"""Aggregate time logs by native ERPNext project and task."""
 	aggregated_time_logs = {
-		# (log.project, log.task, log.key): {
+		# (log.project, log.task): {
 		#     customer_notes: [],
 		#     internal_notes: [],
 		#     billable_hours: 0,
@@ -324,19 +321,19 @@ def aggregate_time_logs(time_logs) -> dict[tuple[str | None, str | None, str | N
 			hours, billing_hours = calculate_hours(log)
 			customer_note, internal_note = parse_note(log.note)
 
-			if (log.project, log.task, log.key) in aggregated_time_logs:
-				aggregated_time_logs[(log.project, log.task, log.key)]["hours"] += hours
-				aggregated_time_logs[(log.project, log.task, log.key)]["billable_hours"] += billing_hours
+			if (log.project, log.task) in aggregated_time_logs:
+				aggregated_time_logs[(log.project, log.task)]["hours"] += hours
+				aggregated_time_logs[(log.project, log.task)]["billable_hours"] += billing_hours
 
-				customer_notes = aggregated_time_logs[(log.project, log.task, log.key)]["customer_notes"]
+				customer_notes = aggregated_time_logs[(log.project, log.task)]["customer_notes"]
 				if customer_note and (not customer_notes or customer_notes[-1] != customer_note):
 					customer_notes.append(customer_note)
 
-				internal_notes = aggregated_time_logs[(log.project, log.task, log.key)]["internal_notes"]
+				internal_notes = aggregated_time_logs[(log.project, log.task)]["internal_notes"]
 				if internal_note and (not internal_notes or internal_notes[-1] != internal_note):
 					internal_notes.append(internal_note)
 			else:
-				aggregated_time_logs[(log.project, log.task, log.key)] = {
+				aggregated_time_logs[(log.project, log.task)] = {
 					"hours": hours,
 					"billable_hours": billing_hours,
 					"customer_notes": [customer_note] if customer_note else [],
