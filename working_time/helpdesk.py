@@ -1,6 +1,8 @@
+from datetime import datetime, timedelta
+
 import frappe
 from frappe import _
-from frappe.utils import cint, getdate
+from frappe.utils import cint, get_time, getdate
 
 from working_time.permissions import get_user_employee, require_time_booking_identity
 
@@ -46,10 +48,14 @@ def _ticket_with_read_access(ticket: str):
 	return doc
 
 
-def validate_ticket_booking(ticket: str, project: str, task: str | None = None) -> None:
+def validate_ticket_booking(ticket: str, project: str | None, task: str | None = None) -> None:
 	require_time_booking_identity()
 	ticket_doc = _ticket_with_read_access(ticket)
 	customer = _ticket_customer(ticket_doc)
+	if not project:
+		if task:
+			frappe.throw(_("A task cannot be booked without a project."))
+		return
 	project_doc = frappe.get_doc("Project", project)
 	if customer:
 		if project_doc.customer != customer:
@@ -91,6 +97,8 @@ def get_ticket_time_context(ticket: str, date: str):
 	project = ticket_doc.get("erpnext_project")
 	if project and project not in {row.name for row in projects}:
 		project = None
+	if not project and len(projects) == 1:
+		project = projects[0].name
 	return {
 		"ticket": ticket_doc.name,
 		"employee": employee,
@@ -99,6 +107,7 @@ def get_ticket_time_context(ticket: str, date: str):
 		"projects": projects,
 		"project": project,
 		"task": ticket_doc.get("erpnext_task") if project else None,
+		"project_ambiguous": not project and len(projects) > 1,
 	}
 
 
@@ -107,8 +116,9 @@ def add_ticket_time(
 	ticket: str,
 	date: str,
 	duration_minutes: int,
-	project: str,
+	project: str | None = None,
 	task: str | None = None,
+	start_time: str | None = None,
 	customer_description: str | None = None,
 	internal_note: str | None = None,
 	billable: int | str = 1,
@@ -117,13 +127,27 @@ def add_ticket_time(
 	duration_minutes = cint(duration_minutes)
 	if duration_minutes <= 0:
 		frappe.throw(_("Duration must be greater than zero."))
+	context = get_ticket_time_context(ticket_doc.name, date)
+	project = project or context.get("project")
+	task = task or (context.get("task") if project else None)
 	validate_ticket_booking(ticket_doc.name, project, task)
 	working_time = get_or_create_daily_working_time(employee, date)
 	doc = frappe.get_doc("Working Time", working_time.name)
+	from_time = to_time = None
+	if start_time:
+		try:
+			start = get_time(start_time)
+		except (TypeError, ValueError):
+			frappe.throw(_("Invalid start time."))
+		start_datetime = datetime.combine(getdate(date), start)
+		from_time = start.strftime("%H:%M:%S")
+		to_time = (start_datetime + timedelta(minutes=duration_minutes)).time().strftime("%H:%M:%S")
 	doc.append(
 		"time_logs",
 		{
 			"duration": duration_minutes * 60,
+			"from_time": from_time,
+			"to_time": to_time,
 			"project": project,
 			"task": task,
 			"helpdesk_ticket": ticket_doc.name,

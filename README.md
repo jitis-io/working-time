@@ -76,7 +76,7 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
 
 ## Upgrade to 1.3.0
 
-- Helpdesk 1.28.1 and Telephony are required apps. The internal ticket action **Zeit buchen** opens the duration-only quick-entry page; it is not exposed in the customer portal.
+- Helpdesk 1.28.1 and Telephony are required apps. The internal ticket action **Zeit buchen** records start time and duration without asking the agent for a Project. The server reuses the ticket Project or the only matching open customer Project; ambiguous allocation remains visible in the daily draft and must be resolved before submit. The action is not exposed in the customer portal.
 - Projects use native `Project.sales_order` and the explicit billing models Non-billable, Time and Material, Fixed Price and Recurring. Billing Review accepts only T&M projects with a submitted Sales Order and positive hourly rate.
 - The migration conflict-checks `source_sales_order`, derives workday fields without rewriting submitted log durations, migrates draft notes and removes the retired fields only after a reference preflight.
 - Billing Review still rounds once per customer/project/task/day. Ticket boundaries never create additional rounding.

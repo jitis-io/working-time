@@ -30,4 +30,5 @@ class WorkingTimeLog(Document):
 
 	def set_duration(self):
 		if self.from_time and self.to_time:
-			self.duration = (self.to_time - self.from_time).total_seconds()
+			duration = (self.to_time - self.from_time).total_seconds()
+			self.duration = duration if duration >= 0 else duration + 24 * 60 * 60

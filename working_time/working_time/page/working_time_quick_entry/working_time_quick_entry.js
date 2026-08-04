@@ -14,9 +14,8 @@ frappe.pages["working-time-quick-entry"].on_page_load = async function (wrapper)
 		fields: [
 			{ fieldname: "ticket", fieldtype: "Link", options: "HD Ticket", label: __("Ticket"), read_only: 1, default: context.ticket },
 			{ fieldname: "date", fieldtype: "Date", label: __("Date"), reqd: 1, default: context.date },
+			{ fieldname: "start_time", fieldtype: "Time", label: __("Start time"), reqd: 1, default: frappe.datetime.now_time() },
 			{ fieldname: "duration_minutes", fieldtype: "Int", label: __("Duration (minutes)"), reqd: 1 },
-			{ fieldname: "project", fieldtype: "Link", options: "Project", label: __("Project"), reqd: 1, default: context.project, get_query: () => ({ filters: { name: ["in", context.projects.map((row) => row.name)] } }) },
-			{ fieldname: "task", fieldtype: "Link", options: "Task", label: __("Task"), default: context.task, get_query: () => ({ filters: { project: fields.get_value("project") } }) },
 			{ fieldname: "customer_description", fieldtype: "Small Text", label: __("Customer Description") },
 			{ fieldname: "internal_note", fieldtype: "Small Text", label: __("Internal Note") },
 			{ fieldname: "billable", fieldtype: "Check", label: __("Billable"), default: 1 },
@@ -26,7 +25,12 @@ frappe.pages["working-time-quick-entry"].on_page_load = async function (wrapper)
 	page.set_primary_action(__("Book time"), async () => {
 		const values = fields.get_values();
 		if (!values) return;
-		const result = await frappe.xcall("working_time.helpdesk.add_ticket_time", { ticket, ...values });
+		const result = await frappe.xcall("working_time.helpdesk.add_ticket_time", {
+			ticket,
+			project: context.project || null,
+			task: context.task || null,
+			...values,
+		});
 		frappe.show_alert({ message: __("Time booked"), indicator: "green" });
 		window.location.href = result.route;
 	});

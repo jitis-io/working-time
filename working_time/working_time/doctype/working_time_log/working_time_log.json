@@ -45,16 +45,14 @@
    "fieldname": "from_time",
    "fieldtype": "Time",
    "in_list_view": 1,
-   "label": "From",
-   "hidden": 1
+   "label": "From"
   },
   {
    "columns": 1,
    "fieldname": "to_time",
    "fieldtype": "Time",
    "in_list_view": 1,
-   "label": "To",
-   "hidden": 1
+   "label": "To"
   },
   {
    "fieldname": "helpdesk_ticket",
