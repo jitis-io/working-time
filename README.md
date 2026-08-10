@@ -31,7 +31,7 @@ Teams that use ERPNext Projects and Tasks as the single work-management and bill
 - Install this app
 
    ```bash
-   bench get-app --branch version-16 working_time ssh://git@git-ssh.jitis.io:2222/jitis/erpnext/working_time.git
+   bench get-app working_time https://github.com/jitis-io/working-time.git
    bench install-app working_time
    ```
 

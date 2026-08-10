@@ -6,7 +6,7 @@ RUNNER_USER=runner
 RUNNER_HOME=/home/runner
 MYSQL_HOST=mariadb
 MYSQL_PORT=3306
-WORKSPACE="${CI_PROJECT_DIR:-$PWD}"
+WORKSPACE="${GITHUB_WORKSPACE:-$PWD}"
 
 if ! id -u "$RUNNER_USER" >/dev/null 2>&1; then
 	sudo useradd -m -d "$RUNNER_HOME" -s /bin/bash "$RUNNER_USER"
@@ -16,7 +16,7 @@ sudo mkdir -p "$RUNNER_HOME"
 sudo chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 
 run_as_runner() {
-	sudo -H -u "$RUNNER_USER" env PATH="$PATH" CI_PROJECT_DIR="$WORKSPACE" bash -lc "$1"
+	sudo -H -u "$RUNNER_USER" env PATH="$PATH" GITHUB_WORKSPACE="$WORKSPACE" bash -lc "$1"
 }
 
 cd "$RUNNER_HOME" || exit
