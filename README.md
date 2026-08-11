@@ -118,6 +118,15 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
 - This release does not install or activate any external provider and does not change the production
   ERP image lock.
 
+## Upgrade to 1.5.1
+
+- Installation and migration force-sync the app-owned Work Cockpit Page and Platform Operations
+  Workspace metadata. This repairs older database copies without requiring a manual Workspace import.
+- Creating Billing Review invoice drafts now locks the review row. Concurrent clicks and safe retries
+  return the already linked drafts instead of creating duplicate Sales Invoices.
+- Existing Billing Review claims take precedence over later Project configuration changes, so the
+  **Unbilled** view cannot relabel an already drafted or invoiced Timesheet row as open work.
+
 ### ALYF attribution
 
 The daily-form interaction was informed by ALYF GmbH's MIT-licensed `time_capture` project. Its ideas for start/end/break, unallocated time and duration distribution were adapted to this app's v16 data and billing model. `time_capture` itself is not installed or used as a second source of truth. Copyright remains with ALYF GmbH and its contributors.

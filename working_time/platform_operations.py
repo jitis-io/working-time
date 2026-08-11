@@ -419,6 +419,11 @@ def _claimed_billing_sources(exclude_review: str | None = None) -> dict[str, str
 
 
 def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, dict[str, Any]]:
+	claimed_status = claimed_sources.get(str(detail.name))
+	if claimed_status == "Draft Created":
+		return "Already Drafted", {}
+	if claimed_status:
+		return "Already Invoiced", {}
 	project_name = detail.get("project")
 	if not project_name:
 		return "Missing Project", {}
@@ -432,11 +437,6 @@ def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, 
 	sales_order = project.get("sales_order")
 	if not sales_order or not frappe.db.exists("Sales Order", {"name": sales_order, "docstatus": 1}):
 		return "Missing Sales Order", {"project": project}
-	claimed_status = claimed_sources.get(str(detail.name))
-	if claimed_status == "Draft Created":
-		return "Already Drafted", {"project": project, "sales_order": sales_order}
-	if claimed_status:
-		return "Already Invoiced", {"project": project, "sales_order": sales_order}
 	return "Eligible", {"project": project, "sales_order": sales_order}
 
 
@@ -647,12 +647,24 @@ def assert_timesheet_unclaimed(timesheet: Any) -> None:
 @frappe.whitelist()
 def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	_only_system_manager()
+	# Serialize draft creation for this review. Client retries and concurrent
+	# clicks must observe the first transaction instead of creating duplicate
+	# Sales Invoices from the same Timesheet Details.
+	frappe.db.sql(
+		"select name from `tabBilling Review` where name=%s for update",
+		(review_name,),
+	)
+	review = frappe.get_doc("Billing Review", review_name)
+	if review.status in {"Draft Created", "Invoiced"}:
+		invoices = sorted({item.sales_invoice for item in review.items if item.sales_invoice})
+		if not invoices:
+			frappe.throw(_("This billing review is marked as invoiced but has no linked Sales Invoices."))
+		return {"name": review.name, "sales_invoices": invoices, "created": False}
+	if review.status != "Preview":
+		frappe.throw(_("Only a billing preview can create invoice drafts."))
 	settings = _settings()
 	if not settings.default_time_billing_item:
 		frappe.throw(_("Set Default time billing item in Platform Operations Settings first."))
-	review = frappe.get_doc("Billing Review", review_name)
-	if review.status != "Preview":
-		frappe.throw(_("Only a billing preview can create invoice drafts."))
 	eligible_items = [item for item in review.items if item.status == "Eligible"]
 	if not eligible_items:
 		frappe.throw(_("This billing preview has no eligible rows."))
@@ -713,7 +725,7 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	review.status = "Draft Created"
 	review.result_json = _json({"sales_invoices": invoices, "status": "Draft Created"})
 	review.save(ignore_permissions=True)
-	return {"name": review.name, "sales_invoices": invoices}
+	return {"name": review.name, "sales_invoices": invoices, "created": True}
 
 
 @frappe.whitelist()
