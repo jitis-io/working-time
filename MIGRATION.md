@@ -1,5 +1,18 @@
 # Working Time migrations
 
+## 1.5.0 — native Work Cockpit
+
+1. Promote the tested immutable ERP image; do not run `bench update` or pull an app branch in production.
+2. Run the normal site migration and asset build. The migration idempotently adds the Issue/Task operational
+   state, Issue planning date, Project Contract link and Task attachment display fields.
+3. Confirm `/app/work-cockpit` as a System Manager and as one assigned Employee. The employee must not see
+   an unassigned Issue or Task, even when its role could otherwise list that DocType.
+4. Promote one Issue twice and confirm both actions route to the same open Task. Confirm private Issue files
+   are linked from that Task without creating additional `File` records.
+5. Compare **Nicht abgerechnet** with a narrow Billing Review preview. Eligible and exception states must
+   agree; invoice submission remains manual.
+6. Provider apps are optional and activated separately. A provider outage must leave native work visible.
+
 ## 1.3.1 — upgrade ordering hotfix
 
 - Existing sites now create the v1.3 Project and integration custom fields before the data backfill patch queries them.

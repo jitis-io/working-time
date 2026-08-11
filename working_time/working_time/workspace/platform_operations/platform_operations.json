@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"operations-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Platform Operations</span>\",\"col\":12}},{\"id\":\"operations-help\",\"type\":\"text\",\"data\":{\"text\":\"<div class=\\\"text-muted\\\">Native ERPNext project provisioning, billing review and operational alerts.</div>\",\"col\":12}},{\"id\":\"customer-links\",\"type\":\"card\",\"data\":{\"card_name\":\"Customer Lifecycle\",\"col\":6}},{\"id\":\"ops-links\",\"type\":\"card\",\"data\":{\"card_name\":\"Operations\",\"col\":6}}]",
+ "content": "[{\"id\":\"operations-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Platform Operations</span>\",\"col\":12}},{\"id\":\"operations-help\",\"type\":\"text\",\"data\":{\"text\":\"<div class=\\\"text-muted\\\">Native ERPNext work cockpit, project provisioning, billing review and operational alerts.</div>\",\"col\":12}},{\"id\":\"work-links\",\"type\":\"card\",\"data\":{\"card_name\":\"Work\",\"col\":12}},{\"id\":\"customer-links\",\"type\":\"card\",\"data\":{\"card_name\":\"Customer Lifecycle\",\"col\":6}},{\"id\":\"ops-links\",\"type\":\"card\",\"data\":{\"card_name\":\"Operations\",\"col\":6}}]",
  "creation": "2026-08-02 00:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -11,6 +11,8 @@
  "is_hidden": 0,
  "label": "Platform Operations",
  "links": [
+  {"hidden": 0, "is_query_report": 0, "label": "Work", "link_count": 1, "link_type": "Page", "onboard": 0, "type": "Card Break"},
+  {"hidden": 0, "is_query_report": 0, "label": "Work Cockpit", "link_count": 0, "link_to": "work-cockpit", "link_type": "Page", "onboard": 0, "type": "Link"},
   {"hidden": 0, "is_query_report": 0, "label": "Customer Lifecycle", "link_count": 2, "link_type": "DocType", "onboard": 0, "type": "Card Break"},
   {"hidden": 0, "is_query_report": 0, "label": "Customer Project Provisioning", "link_count": 0, "link_to": "Customer Project Provisioning", "link_type": "DocType", "onboard": 0, "type": "Link"},
   {"hidden": 0, "is_query_report": 0, "label": "Billing Review", "link_count": 0, "link_to": "Billing Review", "link_type": "DocType", "onboard": 0, "type": "Link"},
@@ -25,7 +27,7 @@
  "owner": "Administrator",
  "public": 1,
  "quick_lists": [],
- "roles": [{"role": "System Manager"}],
+ "roles": [{"role": "Employee"}, {"role": "Projects User"}, {"role": "Projects Manager"}, {"role": "Support Team"}, {"role": "System Manager"}],
  "sequence_id": 55.0,
  "shortcuts": [{"color": "Blue", "doc_view": "New", "format": "{} Drafts", "label": "New Billing Review", "link_to": "Billing Review", "type": "DocType"}],
  "title": "Platform Operations"

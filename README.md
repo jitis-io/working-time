@@ -13,6 +13,10 @@ Teams that use ERPNext Projects and Tasks as the single work-management and bill
 - Preserves actual and raw billable time without rounding
 - Rounds billable time upward to 15-minute increments only after daily customer/project/task aggregation
 - Uses ERPNext Tasks and local customer notes for Timesheet descriptions
+- Provides a permission-safe **Work Cockpit** for assigned ERPNext Issues and Tasks with Today,
+  Blocked, Waiting for Customer and Unbilled views
+- Promotes an Issue to one idempotently linked Task while retaining the Issue as the attachment source
+- Shows commercial Project context from Contract, Sales Order, Billing Review and Sales Invoice
 - Creates and submits one ERPNext **Timesheet** per employee/day/project after the complete day is validated
 - Creates ERPNext **Attendances**
 - Report of actual vs. expected working time per Employee
@@ -93,6 +97,26 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
   the immutable ERP image and run `bench --site <site> migrate` only in that release process.
 - Do not run `bench update` or pull Git branches in the production container. Versions are selected
   in the ERP platform app lock, tested in a new image and promoted by immutable image digest.
+
+## Upgrade to 1.5.0
+
+- Run the normal immutable-image migration. `after_migrate` provisions the operational-state fields on
+  Issue and Task, the Issue planning date, the Project Contract link and the Task attachment display.
+- Open **Platform Operations > Work Cockpit**. System Managers see all native-readable open work;
+  other system users see only native-readable Issues and Tasks currently assigned to them.
+- **Nicht abgerechnet** uses the same eligibility and claim statuses as Billing Review. It does not
+  infer invoice state from labels or task status.
+- **In Task übernehmen** locks the Issue while checking for an existing open Task. Repeated and
+  concurrent requests reuse the existing Task, and private Issue files remain linked rather than copied.
+- The optional `work_cockpit_providers` hook lets an installed app add external items without modifying
+  this app. A provider is called as `provider(view=<view>, user=<session-user>)` and returns dictionaries
+  with required `external_id` and `title` keys. Optional normalized keys are `source`, `status`,
+  `priority`, `customer`, `project`, `due_date`, `operational_state`, `assigned_to`, `route`,
+  `actual_hours`, `worked_today`, `billing_statuses`, `unbilled`, `commercial_context`,
+  `promotion_method` and `promotion_args`. Providers must enforce their own permissions; one provider
+  failure is logged and isolated from native work and other providers.
+- This release does not install or activate any external provider and does not change the production
+  ERP image lock.
 
 ### ALYF attribution
 
