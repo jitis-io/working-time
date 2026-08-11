@@ -324,3 +324,42 @@ msgstr "{0} ist laut Ihrer Feiertagsliste ein Feiertag"
 #: working_time/working_time/workspace/time_tracking/time_tracking.json
 msgid "{} Drafts"
 msgstr "{} Entwürfe"
+
+msgid "Work Cockpit"
+msgstr "Arbeitscockpit"
+
+msgid "View"
+msgstr "Ansicht"
+
+msgid "Today"
+msgstr "Heute"
+
+msgid "Unbilled"
+msgstr "Nicht abgerechnet"
+
+msgid "All open"
+msgstr "Alle offenen"
+
+msgid "Refresh"
+msgstr "Aktualisieren"
+
+msgid "Work item"
+msgstr "Vorgang"
+
+msgid "Due"
+msgstr "Fällig"
+
+msgid "Operational State"
+msgstr "Operativer Zustand"
+
+msgid "Planned Date"
+msgstr "Planungsdatum"
+
+msgid "Issue Attachments"
+msgstr "Issue-Anhänge"
+
+msgid "One or more external providers could not be loaded. Native work remains available."
+msgstr "Mindestens ein externer Anbieter konnte nicht geladen werden. Die nativen Vorgänge bleiben verfügbar."
+
+msgid "No work items in this view."
+msgstr "Keine Vorgänge in dieser Ansicht."

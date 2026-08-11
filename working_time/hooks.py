@@ -36,6 +36,8 @@ doctype_js = {
 	"Billing Review": "public/js/billing_review.js",
 	"Platform Operations Settings": "public/js/platform_operations_settings.js",
 	"Issue": "public/js/issue.js",
+	"Project": "public/js/project.js",
+	"Task": "public/js/task.js",
 }
 
 doctype_list_js = {
@@ -204,6 +206,46 @@ working_time_custom_fields = {
 			"options": "currency",
 			"insert_after": "cost_center",
 			"translatable": 0,
+		},
+		{
+			"fieldname": "contract",
+			"label": "Contract",
+			"fieldtype": "Link",
+			"options": "Contract",
+			"insert_after": "sales_order",
+		},
+	],
+	"Issue": [
+		{
+			"fieldname": "working_time_operational_state",
+			"label": "Operational State",
+			"fieldtype": "Select",
+			"options": "Normal\nBlockiert\nWartet auf Kunde",
+			"default": "Normal",
+			"insert_after": "status",
+		},
+		{
+			"fieldname": "working_time_planned_date",
+			"label": "Planned Date",
+			"fieldtype": "Date",
+			"insert_after": "working_time_operational_state",
+		},
+	],
+	"Task": [
+		{
+			"fieldname": "working_time_operational_state",
+			"label": "Operational State",
+			"fieldtype": "Select",
+			"options": "Normal\nBlockiert\nWartet auf Kunde",
+			"default": "Normal",
+			"insert_after": "status",
+		},
+		{
+			"fieldname": "working_time_issue_attachments_html",
+			"label": "Issue Attachments",
+			"fieldtype": "HTML",
+			"insert_after": "issue",
+			"depends_on": "eval:doc.issue",
 		},
 	],
 	"Timesheet": [
