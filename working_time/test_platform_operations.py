@@ -27,6 +27,7 @@ def _bootstrap_frappe_stub() -> None:
 		exists=lambda *args, **kwargs: False,
 		set_value=lambda *args, **kwargs: None,
 		escape=lambda value: repr(value),
+		sql=lambda *args, **kwargs: [],
 	)
 	frappe.get_roles = lambda *args, **kwargs: []
 	frappe.get_all = lambda *args, **kwargs: []
@@ -44,6 +45,7 @@ FrappeValidationError = getattr(frappe, "ValidationError", RuntimeError)
 
 from working_time.platform_operations import (
 	_aggregate_billing_sources,
+	_billing_status,
 	_ensure_erpnext_project,
 	_provisioning_preview,
 	_round_billable_hours,
@@ -359,6 +361,41 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(first["ticket_references"], "ISS-2026-00001, ISS-2026-00002")
 		self.assertEqual(first["customer_description"], "First intervention; Second intervention")
 
+	def test_claimed_billing_source_wins_over_changed_project_configuration(self):
+		detail = FakeDocument(name="ROW-0001", project="PROJ-0001")
+		with patch("working_time.platform_operations.frappe.get_doc") as get_doc:
+			status, context = _billing_status(detail, {"ROW-0001": "Draft Created"})
+
+		self.assertEqual(status, "Already Drafted")
+		self.assertEqual(context, {})
+		get_doc.assert_not_called()
+
+	def test_invoice_creation_retry_reuses_linked_drafts_after_row_lock(self):
+		item = FakeDocument(status="Draft Created", sales_invoice="SINV-0001")
+		review = FakeDocument(name="BR-0001", status="Draft Created", items=[item])
+		with (
+			patch(
+				"working_time.platform_operations._settings",
+				return_value=FakeDocument(default_time_billing_item="TIME"),
+			),
+			patch("working_time.platform_operations.frappe.db.sql") as sql,
+			patch("working_time.platform_operations.frappe.get_doc", return_value=review),
+		):
+			result = create_billing_invoice_drafts("BR-0001")
+
+		self.assertEqual(
+			sql.call_args.args,
+			("select name from `tabBilling Review` where name=%s for update", ("BR-0001",)),
+		)
+		self.assertEqual(
+			result,
+			{
+				"name": "BR-0001",
+				"sales_invoices": ["SINV-0001"],
+				"created": False,
+			},
+		)
+
 	def test_invoice_creation_marks_review_as_draft_created(self):
 		item = FakeDocument(
 			status="Eligible",
@@ -412,6 +449,7 @@ class TestPlatformOperations(unittest.TestCase):
 			result = create_billing_invoice_drafts("BR-0001")
 
 		self.assertEqual(result["sales_invoices"], ["SINV-0001"])
+		self.assertTrue(result["created"])
 		self.assertEqual(review.status, "Draft Created")
 		self.assertEqual(item.status, "Draft Created")
 		self.assertEqual(item.sales_invoice, "SINV-0001")

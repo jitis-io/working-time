@@ -1,5 +1,16 @@
 # Working Time migrations
 
+## 1.5.1 — upgrade and invoice retry safety
+
+1. Promote the tested immutable ERP image and run the normal site migration. The migration force-syncs
+   the app-owned `work-cockpit` Page and `Platform Operations` Workspace, so no manual force import is
+   required.
+2. Confirm that **Platform Operations > Work Cockpit** is present after a second no-op migration as well.
+3. Create a narrow Billing Review preview. Trigger draft creation once and confirm the result contains
+   `created: true`; a safe retry must return the same Sales Invoice names with `created: false`.
+4. Do not submit or send invoices automatically. Review the drafts, render `Ausgangsrechnung`, submit each
+   invoice manually, and only then finalize the Billing Review.
+
 ## 1.5.0 — native Work Cockpit
 
 1. Promote the tested immutable ERP image; do not run `bench update` or pull an app branch in production.

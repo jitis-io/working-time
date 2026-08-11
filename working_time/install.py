@@ -19,12 +19,25 @@ OBSOLETE_CUSTOM_FIELDS = {
 def after_install():
 	make_custom_fields()
 	insert_docs()
+	ensure_work_cockpit_metadata()
 	update_projects_settings()
 
 
 def after_migrate():
 	make_custom_fields()
 	insert_docs()
+	ensure_work_cockpit_metadata()
+
+
+def ensure_work_cockpit_metadata():
+	"""Force-sync the app-owned Desk metadata on existing sites.
+
+	Frappe can retain a newer database copy of a standard Workspace during an
+	upgrade. Reloading both documents keeps the stable Work Cockpit route and
+	its Platform Operations link present without editing user-owned records.
+	"""
+	frappe.reload_doc("working_time", "page", "work_cockpit", force=True)
+	frappe.reload_doc("working_time", "workspace", "platform_operations", force=True)
 
 
 def make_custom_fields():
