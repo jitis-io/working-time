@@ -459,7 +459,7 @@ def _aggregate_billing_sources(sources: list[dict[str, Any]]) -> list[dict[str, 
 			{
 				"timesheet": source["timesheet"],
 				"timesheet_detail": source["timesheet_detail"],
-				"helpdesk_ticket": source.get("helpdesk_ticket"),
+				"issue": source.get("issue"),
 				"customer_description": source.get("customer_description"),
 			}
 		)
@@ -473,16 +473,14 @@ def _aggregate_billing_sources(sources: list[dict[str, Any]]) -> list[dict[str, 
 		group["raw_billable_hours"] = float(raw_billable_hours)
 		group["hours"] = _round_billable_hours(raw_billable_hours)
 		group["amount"] = group["hours"] * float(group["rate"] or 0)
-		tickets = sorted(
-			{source["helpdesk_ticket"] for source in group["sources"] if source.get("helpdesk_ticket")}
-		)
+		issues = sorted({source["issue"] for source in group["sources"] if source.get("issue")})
 		descriptions = []
 		for source in group["sources"]:
 			description = source.get("customer_description")
 			if description and description not in descriptions:
 				descriptions.append(description)
-		group["helpdesk_ticket"] = tickets[0] if len(tickets) == 1 else None
-		group["ticket_references"] = ", ".join(tickets)
+		group["issue"] = issues[0] if len(issues) == 1 else None
+		group["ticket_references"] = ", ".join(issues)
 		group["customer_description"] = "; ".join(descriptions)
 		result.append(group)
 	return result
@@ -499,7 +497,7 @@ def _billing_source(detail: Any, timesheet: Any, status: str, context: dict[str,
 		"customer": project.customer if project else None,
 		"project": project.name if project else detail.get("project"),
 		"task": detail.get("task"),
-		"helpdesk_ticket": detail.get("helpdesk_ticket"),
+		"issue": detail.get("issue"),
 		"customer_description": detail.get("customer_description") or detail.get("description"),
 		"sales_order": context.get("sales_order"),
 		"work_date": _billing_date(detail, timesheet),

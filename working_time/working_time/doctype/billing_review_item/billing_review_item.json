@@ -11,7 +11,7 @@
   "customer",
   "project",
   "task",
-  "helpdesk_ticket",
+  "issue",
   "ticket_references",
   "customer_description",
   "work_date",
@@ -26,10 +26,10 @@
  ],
  "fields": [
   {
-   "fieldname": "helpdesk_ticket",
+   "fieldname": "issue",
    "fieldtype": "Link",
-   "label": "Helpdesk Ticket",
-   "options": "HD Ticket",
+   "label": "Issue",
+   "options": "Issue",
    "read_only": 1
   },
   {"fieldname": "ticket_references", "fieldtype": "Small Text", "label": "Ticket References", "read_only": 1},

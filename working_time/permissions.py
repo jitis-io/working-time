@@ -4,7 +4,7 @@ from frappe import _
 TECHNICAL_SERVICE_ROLES = frozenset(
 	{
 		"JITIS Portal ERP Reader",
-		"JITIS Portal Helpdesk Integration",
+		"JITIS Portal Support Integration",
 		"JITIS Portal Wiki Reader",
 	}
 )

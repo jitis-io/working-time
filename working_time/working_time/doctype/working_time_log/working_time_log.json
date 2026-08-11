@@ -14,7 +14,7 @@
   "section_break_5",
   "project",
   "task",
-  "helpdesk_ticket",
+  "issue",
   "customer_description",
   "internal_note",
   "note",
@@ -55,10 +55,10 @@
    "label": "To"
   },
   {
-   "fieldname": "helpdesk_ticket",
+   "fieldname": "issue",
    "fieldtype": "Link",
-   "label": "Helpdesk Ticket",
-   "options": "HD Ticket",
+   "label": "Issue",
+   "options": "Issue",
    "read_only": 1
   },
   {"fieldname": "customer_description", "fieldtype": "Small Text", "in_list_view": 1, "label": "Customer Description"},

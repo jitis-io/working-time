@@ -7,7 +7,7 @@ Teams that use ERPNext Projects and Tasks as the single work-management and bill
 ## Features
 
 - Provides one complete daily form with start, end, required/indicated break and unallocated time
-- Books duration-first entries against Projects, Tasks and Helpdesk Tickets
+- Books duration-first entries against Projects, Tasks and ERPNext Issues
 - Keeps customer-facing descriptions separate from internal notes
 - Allows to set a percentage of working time as billable time in a Working Time Log
 - Preserves actual and raw billable time without rounding
@@ -45,7 +45,7 @@ Teams that use ERPNext Projects and Tasks as the single work-management and bill
 - Create **Activity Cost** records for your **Employees** (_Activity Type_: "Default")
 - Create your first **Working Time**
     - Enter start, end and break,
-    - distribute the complete net duration across Projects, Tasks or Helpdesk Tickets,
+    - distribute the complete net duration across Projects, Tasks or Issues,
     - add a customer description and an internal note where useful
 - Submit your **Working Time**
 
@@ -80,6 +80,19 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
 - Projects use native `Project.sales_order` and the explicit billing models Non-billable, Time and Material, Fixed Price and Recurring. Billing Review accepts only T&M projects with a submitted Sales Order and positive hourly rate.
 - The migration conflict-checks `source_sales_order`, derives workday fields without rewriting submitted log durations, migrates draft notes and removes the retired fields only after a reference preflight.
 - Billing Review still rounds once per customer/project/task/day. Ticket boundaries never create additional rounding.
+
+## Upgrade to 1.4.0
+
+- Helpdesk is no longer a dependency. The internal **Zeit buchen** action is attached to ERPNext
+  **Issue** and stores the native Issue reference on Working Time Log and Timesheet Detail.
+- An Issue may point directly to a Project. ERPNext's native **Create Task** action creates the
+  operational Task when a support request needs planned work; time booking validates that Issue,
+  Project and Task belong to the same customer and workflow.
+- The migration provisions the new Issue links before the platform integration copies legacy
+  Helpdesk references. Deploy this release together with JITIS Platform Integration 0.9.0 through
+  the immutable ERP image and run `bench --site <site> migrate` only in that release process.
+- Do not run `bench update` or pull Git branches in the production container. Versions are selected
+  in the ERP platform app lock, tested in a new image and promoted by immutable image digest.
 
 ### ALYF attribution
 

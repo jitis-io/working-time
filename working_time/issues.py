@@ -7,63 +7,41 @@ from frappe.utils import cint, get_time, getdate
 from working_time.permissions import get_user_employee, require_time_booking_identity
 
 
-def _target_ticket(ticket: str) -> str:
-	doc = frappe.get_doc("HD Ticket", ticket)
-	if doc.get("is_merged"):
-		target = doc.get_merge_target()
-		if not target:
-			frappe.throw(_("The merged ticket has no valid target ticket."))
-		return str(target)
-	for fieldname in ("merged_into", "merged_with", "merged_ticket"):
-		if doc.meta.has_field(fieldname) and doc.get(fieldname):
-			return str(doc.get(fieldname))
-	return doc.name
-
-
-def _ticket_customer(ticket_doc) -> str | None:
-	if not ticket_doc.customer:
-		return None
-	customers = frappe.get_all(
-		"HD Customer", filters={"name": ticket_doc.customer}, fields=["erpnext_customer"], limit=2
-	)
-	if len(customers) != 1 or not customers[0].erpnext_customer:
-		frappe.throw(_("The ticket customer has no unique ERPNext customer mapping."))
-	return customers[0].erpnext_customer
-
-
-def _require_booking_access(ticket: str):
+def _require_booking_access(issue: str):
 	require_time_booking_identity()
 	employee = get_user_employee()
 	if not employee:
 		frappe.throw(_("Your user account is not linked to an Employee record."), frappe.PermissionError)
-	doc = _ticket_with_read_access(ticket)
+	doc = _issue_with_read_access(issue)
 	return employee, doc
 
 
-def _ticket_with_read_access(ticket: str):
-	ticket = _target_ticket(ticket)
-	doc = frappe.get_doc("HD Ticket", ticket)
-	if not frappe.has_permission("HD Ticket", "read", doc=doc):
-		frappe.throw(_("You are not permitted to read this ticket."), frappe.PermissionError)
+def _issue_with_read_access(issue: str):
+	doc = frappe.get_doc("Issue", issue)
+	if not frappe.has_permission("Issue", "read", doc=doc):
+		frappe.throw(_("You are not permitted to read this issue."), frappe.PermissionError)
 	return doc
 
 
-def validate_ticket_booking(ticket: str, project: str | None, task: str | None = None) -> None:
+def validate_issue_booking(issue: str, project: str | None, task: str | None = None) -> None:
 	require_time_booking_identity()
-	ticket_doc = _ticket_with_read_access(ticket)
-	customer = _ticket_customer(ticket_doc)
+	issue_doc = _issue_with_read_access(issue)
 	if not project:
 		if task:
 			frappe.throw(_("A task cannot be booked without a project."))
 		return
 	project_doc = frappe.get_doc("Project", project)
-	if customer:
-		if project_doc.customer != customer:
-			frappe.throw(_("Ticket and project must belong to the same customer."))
+	if issue_doc.customer:
+		if project_doc.customer != issue_doc.customer:
+			frappe.throw(_("Issue and project must belong to the same customer."))
 	elif project_doc.project_type != "Internal":
-		frappe.throw(_("Internal tickets may only be booked to Internal projects."))
-	if task and frappe.db.get_value("Task", task, "project") != project:
-		frappe.throw(_("The selected task does not belong to the project."))
+		frappe.throw(_("Internal issues may only be booked to Internal projects."))
+	if task:
+		task_state = frappe.db.get_value("Task", task, ["project", "issue"], as_dict=True)
+		if not task_state or task_state.project != project:
+			frappe.throw(_("The selected task does not belong to the project."))
+		if task_state.issue and task_state.issue != issue_doc.name:
+			frappe.throw(_("The selected task belongs to another issue."))
 
 
 @frappe.whitelist()
@@ -81,12 +59,11 @@ def get_or_create_daily_working_time(employee: str, date: str):
 
 
 @frappe.whitelist()
-def get_ticket_time_context(ticket: str, date: str):
-	employee, ticket_doc = _require_booking_access(ticket)
-	customer = _ticket_customer(ticket_doc)
+def get_issue_time_context(issue: str, date: str):
+	employee, issue_doc = _require_booking_access(issue)
 	filters = {"status": "Open"}
-	if customer:
-		filters["customer"] = customer
+	if issue_doc.customer:
+		filters["customer"] = issue_doc.customer
 	else:
 		filters["project_type"] = "Internal"
 	projects = frappe.get_all(
@@ -94,26 +71,33 @@ def get_ticket_time_context(ticket: str, date: str):
 		filters=filters,
 		fields=["name", "project_name", "customer", "project_type", "billing_model"],
 	)
-	project = ticket_doc.get("erpnext_project")
+	project = issue_doc.project
 	if project and project not in {row.name for row in projects}:
 		project = None
 	if not project and len(projects) == 1:
 		project = projects[0].name
+	tasks = frappe.get_all(
+		"Task",
+		filters={"issue": issue_doc.name, "status": ("not in", ("Completed", "Cancelled"))},
+		fields=["name", "project"],
+		limit_page_length=2,
+	)
+	task = tasks[0].name if len(tasks) == 1 and tasks[0].project == project else None
 	return {
-		"ticket": ticket_doc.name,
+		"issue": issue_doc.name,
 		"employee": employee,
 		"date": str(getdate(date)),
-		"customer": customer,
+		"customer": issue_doc.customer,
 		"projects": projects,
 		"project": project,
-		"task": ticket_doc.get("erpnext_task") if project else None,
+		"task": task,
 		"project_ambiguous": not project and len(projects) > 1,
 	}
 
 
 @frappe.whitelist()
-def add_ticket_time(
-	ticket: str,
+def add_issue_time(
+	issue: str,
 	date: str,
 	duration_minutes: int,
 	project: str | None = None,
@@ -123,14 +107,14 @@ def add_ticket_time(
 	internal_note: str | None = None,
 	billable: int | str = 1,
 ):
-	employee, ticket_doc = _require_booking_access(ticket)
+	employee, issue_doc = _require_booking_access(issue)
 	duration_minutes = cint(duration_minutes)
 	if duration_minutes <= 0:
 		frappe.throw(_("Duration must be greater than zero."))
-	context = get_ticket_time_context(ticket_doc.name, date)
+	context = get_issue_time_context(issue_doc.name, date)
 	project = project or context.get("project")
 	task = task or (context.get("task") if project else None)
-	validate_ticket_booking(ticket_doc.name, project, task)
+	validate_issue_booking(issue_doc.name, project, task)
 	working_time = get_or_create_daily_working_time(employee, date)
 	doc = frappe.get_doc("Working Time", working_time.name)
 	from_time = to_time = None
@@ -150,7 +134,7 @@ def add_ticket_time(
 			"to_time": to_time,
 			"project": project,
 			"task": task,
-			"helpdesk_ticket": ticket_doc.name,
+			"issue": issue_doc.name,
 			"customer_description": customer_description,
 			"internal_note": internal_note,
 			"billable": "100%" if cint(billable) else "0%",

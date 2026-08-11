@@ -250,7 +250,7 @@ class WorkingTime(Document):
 						"is_billable": int(billable_hours > 0),
 						"project": project,
 						"task": log.task,
-						"helpdesk_ticket": log.helpdesk_ticket,
+						"issue": log.issue,
 						"activity_type": "Default",
 						"base_billing_rate": billing_rate,
 						"base_costing_rate": costing_rate,
@@ -437,10 +437,10 @@ def validate_billable_percentage(log) -> None:
 def validate_log_links(log) -> None:
 	if log.task and frappe.db.get_value("Task", log.task, "project") != log.project:
 		frappe.throw(_("Task in row {0} does not belong to the selected project.").format(log.idx))
-	if log.helpdesk_ticket:
-		from working_time.helpdesk import validate_ticket_booking
+	if log.issue:
+		from working_time.issues import validate_issue_booking
 
-		validate_ticket_booking(log.helpdesk_ticket, log.project, log.task)
+		validate_issue_booking(log.issue, log.project, log.task)
 
 
 def parse_note(note: str | None) -> tuple[str | None, str | None]:

@@ -8,3 +8,4 @@ working_time.patches.billable_time_pct # 1
 execute:from working_time.install import make_custom_fields; make_custom_fields() # 2026-03-27
 working_time.patches.reclassify_billing_invoice_drafts # 2026-08-01
 working_time.patches.v1_3_migrate # 2026-08-02
+working_time.patches.v1_4_issue_support # 2026-08-11

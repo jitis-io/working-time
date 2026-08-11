@@ -6,7 +6,7 @@ app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "hallo@alyf.de"
 app_license = "-"
-required_apps = ["erpnext", "hrms", "helpdesk"]
+required_apps = ["erpnext", "hrms"]
 
 # Includes in <head>
 # ------------------
@@ -35,6 +35,7 @@ doctype_js = {
 	"Customer Project Provisioning": "public/js/customer_project_provisioning.js",
 	"Billing Review": "public/js/billing_review.js",
 	"Platform Operations Settings": "public/js/platform_operations_settings.js",
+	"Issue": "public/js/issue.js",
 }
 
 doctype_list_js = {
@@ -218,10 +219,10 @@ working_time_custom_fields = {
 	],
 	"Timesheet Detail": [
 		{
-			"fieldname": "helpdesk_ticket",
-			"label": "Helpdesk Ticket",
+			"fieldname": "issue",
+			"label": "Issue",
 			"fieldtype": "Link",
-			"options": "HD Ticket",
+			"options": "Issue",
 			"insert_after": "task",
 			"read_only": 1,
 		},
@@ -238,22 +239,6 @@ working_time_custom_fields = {
 			"fieldtype": "Small Text",
 			"insert_after": "customer_description",
 			"read_only": 1,
-		},
-	],
-	"HD Ticket": [
-		{
-			"fieldname": "erpnext_project",
-			"label": "ERPNext Project",
-			"fieldtype": "Link",
-			"options": "Project",
-			"insert_after": "customer",
-		},
-		{
-			"fieldname": "erpnext_task",
-			"label": "ERPNext Task",
-			"fieldtype": "Link",
-			"options": "Task",
-			"insert_after": "erpnext_project",
 		},
 	],
 	"Attendance": [
