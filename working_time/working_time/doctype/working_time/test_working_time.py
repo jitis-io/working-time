@@ -2,7 +2,7 @@
 # See license.txt
 
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from frappe import ValidationError, _dict
@@ -17,9 +17,19 @@ from working_time.working_time.doctype.working_time.working_time import (
 	should_enforce_billable_percentages,
 	time_difference_seconds,
 )
+from working_time.working_time.doctype.working_time_log.working_time_log import WorkingTimeLog
 
 
 class TestWorkingTime(unittest.TestCase):
+	def test_time_log_starting_at_midnight_keeps_its_duration(self):
+		log = _dict(from_time=timedelta(0), to_time=timedelta(hours=1), duration=0)
+
+		WorkingTimeLog.remove_seconds(log)
+		WorkingTimeLog.set_duration(log)
+
+		self.assertEqual(log.from_time, timedelta(0))
+		self.assertEqual(log.duration, 60 * 60)
+
 	def test_time_difference_supports_regular_and_overnight_days(self):
 		self.assertEqual(time_difference_seconds("08:00", "17:00"), 9 * 60 * 60)
 		self.assertEqual(time_difference_seconds("22:00", "06:00"), 8 * 60 * 60)

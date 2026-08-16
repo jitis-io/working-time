@@ -1,11 +1,11 @@
 app_name = "working_time"
 app_title = "Working Time"
-app_publisher = "ALYF GmbH"
-app_description = "-"
+app_publisher = "ALYF GmbH and JITIS contributors"
+app_description = "Time tracking, project operations and billing review for ERPNext"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
-app_email = "hallo@alyf.de"
-app_license = "-"
+app_email = "info@jitis.io"
+app_license = "GPL-3.0-or-later"
 required_apps = ["erpnext", "hrms"]
 
 # Includes in <head>

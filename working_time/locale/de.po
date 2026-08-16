@@ -139,17 +139,17 @@ msgstr "Tägliche Arbeitsstunden"
 msgid "Daily Working Time"
 msgstr "Tägliche Arbeitszeit"
 
-#: working_time/reminders.py:138
+#: working_time/reminders.py:143
 msgid ""
 "Dear {first_name},\n"
 "\n"
-"Your have a draft <a href='{url}'>working time entry</a> that is older than {cutoff_days} days. Please submit it as soon as possible.\n"
+"One or more of your draft <a href='{url}'>working time entries</a> are older than {cutoff_days} days. Please submit them as soon as possible.\n"
 "\n"
 "Thanks in advance!"
 msgstr ""
 "Hallo {first_name},\n"
 "\n"
-"du hast einen <a href='{url}'>Arbeitszeiteintrag</a> im Entwurf, der älter als {cutoff_days} Tage ist. Bitte reiche ihn so bald wie möglich ein.\n"
+"Einer oder mehrere deiner <a href='{url}'>Arbeitszeiteinträge</a> im Entwurf sind älter als {cutoff_days} Tage. Bitte reiche sie so bald wie möglich ein.\n"
 "\n"
 "Vielen Dank!"
 
