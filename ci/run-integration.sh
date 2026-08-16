@@ -8,9 +8,9 @@ readonly DB_HOST="${DB_HOST:-mariadb}"
 readonly DB_ROOT_USERNAME="${DB_ROOT_USERNAME:-root}"
 readonly DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-root}"
 readonly SITE_NAME="${SITE_NAME:-test_site}"
-readonly FRAPPE_COMMIT="06613fc60b44d5736007ae3107cdab029b2ae045"
-readonly ERPNEXT_COMMIT="8378b6e203841c056925420cc44e6d631c915cf1"
-readonly HRMS_COMMIT="6aa125b976469cb1c342afa3ef07d381c88677e0"
+readonly FRAPPE_COMMIT="6a329d068416768ec47ccd3326b9cc95a8d7bf99"
+readonly ERPNEXT_COMMIT="21d187302045476f1ceb5d0d86219389ab1e75b8"
+readonly HRMS_COMMIT="f281e8b172ac8836ad89c59df65a922101103097"
 
 until mariadb-admin ping --host="$DB_HOST" --user=root --password="$DB_ROOT_PASSWORD" --silent; do
 	sleep 2
@@ -19,8 +19,12 @@ done
 redis-server --daemonize yes --port 13000 --save "" --appendonly no
 redis-server --daemonize yes --port 11000 --save "" --appendonly no
 
+# Keep Bench's own Git operations outside the mounted source checkout. A local
+# Git worktree uses a host-only .git pointer that is intentionally unavailable
+# inside the disposable CI container.
+cd /home/runner
 bench init \
-	--frappe-branch v16.29.0 \
+	--frappe-branch v16.31.0 \
 	--python "$(command -v python)" \
 	--skip-assets \
 	--skip-redis-config-generation \
@@ -29,9 +33,9 @@ bench init \
 cd "$BENCH_DIR"
 test "$(git -C apps/frappe rev-parse HEAD)" = "$FRAPPE_COMMIT"
 
-bench get-app --skip-assets --branch v16.30.0 erpnext https://github.com/frappe/erpnext.git
+bench get-app --skip-assets --branch v16.32.1 erpnext https://github.com/frappe/erpnext.git
 test "$(git -C apps/erpnext rev-parse HEAD)" = "$ERPNEXT_COMMIT"
-bench get-app --skip-assets --branch v16.14.0 hrms https://github.com/frappe/hrms.git
+bench get-app --skip-assets --branch v16.16.0 hrms https://github.com/frappe/hrms.git
 test "$(git -C apps/hrms rev-parse HEAD)" = "$HRMS_COMMIT"
 bench get-app --skip-assets --soft-link working_time "$APP_DIR"
 bench setup requirements --dev

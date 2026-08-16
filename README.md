@@ -1,8 +1,14 @@
-Time tracking, attendance and billing review in ERPNext
+# Working Time
+
+Time tracking, project operations and billing review for ERPNext v16.
 
 ## Who is this for?
 
 Teams that use ERPNext Projects and Tasks as the single work-management and billing source.
+
+The app is independent of the JITIS customer portal. Optional integrations can
+add external work items through the documented `work_cockpit_providers` hook;
+portal identity and customer isolation remain outside this app.
 
 ## Features
 
@@ -137,9 +143,20 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
 - Existing Billing Review claims take precedence over later Project configuration changes, so the
   **Unbilled** view cannot relabel an already drafted or invoiced Timesheet row as open work.
 
-### ALYF attribution
+## Upgrade to 1.5.2
 
-The daily-form interaction was informed by ALYF GmbH's MIT-licensed `time_capture` project. Its ideas for start/end/break, unallocated time and duration distribution were adapted to this app's v16 data and billing model. `time_capture` itself is not installed or used as a second source of truth. Copyright remains with ALYF GmbH and its contributors.
+- The daily stale-draft job sends one reminder per employee instead of one message per old draft.
+- Time rows beginning exactly at midnight now retain their calculated duration.
+- This patch has no schema migration and follows the normal tested application release path.
+
+### Origin and ALYF attribution
+
+This repository is a JITIS-maintained ERPNext v16 derivative of ALYF GmbH's
+GPL-licensed [`working_time`](https://github.com/alyf-de/working_time) app. JITIS
+removed the Jira/OpenProject coupling and added the ERPNext-native project,
+support, billing and Work Cockpit workflows documented above. Original
+copyright remains with ALYF GmbH and its contributors; later modifications
+remain with their respective contributors.
 
 ## License
 

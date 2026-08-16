@@ -1,14 +1,19 @@
 [project]
 name = "working_time"
 authors = [
-    { name = "JITIS GmbH", email = "info@jitis.io"}
+    { name = "ALYF GmbH", email = "hallo@alyf.de" },
+    { name = "Jonas Jakob IT & InfoSec (JITIS)", email = "info@jitis.io" }
+]
+maintainers = [
+    { name = "Jonas Jakob IT & InfoSec (JITIS)", email = "info@jitis.io" }
 ]
 description = "Time tracking, attendance and billing review in ERPNext"
 requires-python = ">=3.11"
 readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
 dynamic = ["version"]
 dependencies = [
-    # frappe -- https://github.com/frappe/frappe is installed via 'bench init' 
+    # frappe -- https://github.com/frappe/frappe is installed via 'bench init'
 ]
 
 [build-system]

@@ -132,14 +132,16 @@ def get_leaves(employee: str, first_date: date, last_date: date) -> list[date]:
 def send_stale_reminders(cutoff_days: int = 3):
 	"""Send reminders to employees to submit their working time entries.
 
-	This method is called every day. If an employee has a draft working time entry
-	that is older than 3 days, it sends a reminder to submit it.
+	This method is called every day. If an employee has one or more draft working
+	time entries older than the configured deadline, it sends one reminder for all
+	of them.
 	"""
 	settings = frappe.get_single("Working Time Settings")
 	if not settings.send_reminders:
 		return
 	cutoff_days = int(settings.submission_deadline_days or cutoff_days)
 	today = date.today()
+	stale_entries_by_employee = {}
 	for working_time, employee in frappe.get_all(
 		"Working Time",
 		filters=[
@@ -149,6 +151,9 @@ def send_stale_reminders(cutoff_days: int = 3):
 		fields=["name", "employee"],
 		as_list=True,
 	):
+		stale_entries_by_employee.setdefault(employee, []).append(working_time)
+
+	for employee in stale_entries_by_employee:
 		language = None
 		user_id, prefered_email, first_name, reports_to = frappe.db.get_value(
 			"Employee", employee, ["user_id", "prefered_email", "first_name", "reports_to"]
@@ -166,12 +171,12 @@ def send_stale_reminders(cutoff_days: int = 3):
 				message=_(
 					"""Dear {first_name},
 
-Your have a draft <a href='{url}'>working time entry</a> that is older than {cutoff_days} days. Please submit it as soon as possible.
+One or more of your draft <a href='{url}'>working time entries</a> are older than {cutoff_days} days. Please submit them as soon as possible.
 
 Thanks in advance!"""
 				).format(
 					first_name=first_name,
-					url=get_url(f"/app/working-time/{working_time}"),
+					url=get_url(f"/app/working-time?employee={employee}&docstatus=0"),
 					cutoff_days=cutoff_days,
 				),
 			)

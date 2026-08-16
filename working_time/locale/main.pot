@@ -139,11 +139,11 @@ msgstr ""
 msgid "Daily Working Time"
 msgstr ""
 
-#: working_time/reminders.py:138
+#: working_time/reminders.py:143
 msgid ""
 "Dear {first_name},\n"
 "\n"
-"Your have a draft <a href='{url}'>working time entry</a> that is older than {cutoff_days} days. Please submit it as soon as possible.\n"
+"One or more of your draft <a href='{url}'>working time entries</a> are older than {cutoff_days} days. Please submit them as soon as possible.\n"
 "\n"
 "Thanks in advance!"
 msgstr ""
