@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   quality:
-    runs-on: [self-hosted, linux, x64, jitis-ci]
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       COMPOSE_PROJECT_NAME: working_time_${{ github.run_id }}_quality
@@ -28,7 +28,7 @@ jobs:
         run: docker compose -f ci/compose.yaml down --volumes --remove-orphans
 
   integration:
-    runs-on: [self-hosted, linux, x64, jitis-ci]
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       COMPOSE_PROJECT_NAME: working_time_${{ github.run_id }}_integration
