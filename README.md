@@ -65,6 +65,16 @@ Project provisioning creates or links an ERPNext Project after an explicit previ
 
 Run Docker quality and clean-bench integration checks before committing; see AGENTS.md.
 
+## Production releases
+
+Do not run `bench update`, pull a branch or replace this app directly in the
+production container. A release is tested and tagged here, then pinned by exact
+version and commit in the private
+[`jitis-erp-platform` operator handbook](https://github.com/jitis-io/jitis-erp-platform/blob/main/OPERATIONS.md).
+That repository builds one immutable ERP image and owns the backup-gated Azure
+production update. The handbook also contains the exact local quality,
+clean-bench, Git tag, Azure access, deployment and recovery commands.
+
 ## Upgrade to 1.2.0
 
 Version 1.2.0 completes the forward-only consolidation on ERPNext:
