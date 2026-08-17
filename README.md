@@ -89,9 +89,9 @@ visible under **Without date** instead of disappearing from the daily view.
 
 Want to add pretty time logs to your invoice? Check out our [print formats](https://github.com/alyf-de/erpnext_druckformate).
 
-## Platform Operations
+## JITIS Work
 
-The **Platform Operations** workspace groups native ERPNext project provisioning, billing reviews and operational alerts. Configure a Teams Workflow webhook and the time-billing Item in Platform Operations Settings. Use **Send Teams test alert** after saving the settings. Alerts use the Adaptive Card envelope required by Teams Workflow. Billing creates drafts only.
+The **JITIS Work** workspace groups native ERPNext project provisioning, billing reviews and operational alerts. Configure a Teams Workflow webhook and the time-billing Item in JITIS Work Settings. Use **Send Teams test alert** after saving the settings. Alerts use the Adaptive Card envelope required by Teams Workflow. Billing creates drafts only.
 
 Project provisioning creates or links an ERPNext Project after an explicit preview. Portal permissions remain owned by the portal.
 
@@ -191,6 +191,16 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
   Issue time booking remains backward-compatible.
 - Installation/migration force-syncs the renamed Page and Workspace metadata and builds the new
   scoped Desk stylesheet through the normal immutable ERP release.
+
+## Upgrade to 1.6.1
+
+- The app keeps the technical `Platform Operations` Workspace identity so Frappe v16 continues to
+  route existing bookmarks and desktop layouts to `/desk/platform-operations`.
+- Compiled English and German catalogs present that stable Workspace, its Sidebar and its Desktop
+  Icon as **JITIS Work**. The German catalog also covers every label in **My Work** and presents the
+  separate `Time Tracking` Workspace as **Zeiterfassung**.
+- Deploy through the normal immutable image path so `bench build --app working_time` compiles the
+  catalogs before the browser cache is refreshed.
 
 ### Origin and ALYF attribution
 

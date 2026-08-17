@@ -1,21 +1,21 @@
-# Translations template for Working Time.
+# German translations for JITIS Work.
 # Copyright (C) 2026 ALYF GmbH
 # This file is distributed under the same license as the Working Time project.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time VERSION\n"
-"Report-Msgid-Bugs-To: hallo@alyf.de\n"
-"POT-Creation-Date: 2026-03-27 14:57+0053\n"
-"PO-Revision-Date: 2026-03-27 14:57+0053\n"
-"Last-Translator: hallo@alyf.de\n"
-"Language-Team: hallo@alyf.de\n"
+"Project-Id-Version: JITIS Work 1.6.1\n"
+"Report-Msgid-Bugs-To: info@jitis.io\n"
+"POT-Creation-Date: 2026-08-17 00:00+0000\n"
+"PO-Revision-Date: 2026-08-17 00:00+0000\n"
+"Last-Translator: JITIS <info@jitis.io>\n"
+"Language-Team: German <info@jitis.io>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.13.1\n"
+"Generated-By: Babel 2.18.0\n"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
@@ -526,3 +526,60 @@ msgstr "Für dieses Ticket kommen mehrere Kundenprojekte infrage. Die gebuchte Z
 
 msgid "Time cannot be booked to a cancelled task."
 msgstr "Auf eine stornierte Aufgabe kann keine Zeit gebucht werden."
+
+msgid "Platform Operations"
+msgstr "JITIS Work"
+
+msgid "Platform Operations Settings"
+msgstr "JITIS-Work-Einstellungen"
+
+msgid "Time Tracking"
+msgstr "Zeiterfassung"
+
+msgid "Billing Review"
+msgstr "Abrechnungsprüfung"
+
+msgid "High"
+msgstr "Hoch"
+
+msgid "Low"
+msgstr "Niedrig"
+
+msgid "Medium"
+msgstr "Mittel"
+
+msgid "Project"
+msgstr "Projekt"
+
+msgid "Projects"
+msgstr "Projekte"
+
+msgid "Urgent"
+msgstr "Dringend"
+
+msgid "Eligible"
+msgstr "Bereit zur Abrechnung"
+
+msgid "Missing Project"
+msgstr "Projekt fehlt"
+
+msgid "Missing Customer"
+msgstr "Kunde fehlt"
+
+msgid "Missing Sales Order"
+msgstr "Auftrag fehlt"
+
+msgid "Locked"
+msgstr "Gesperrt"
+
+msgid "Already Drafted"
+msgstr "Rechnungsentwurf vorhanden"
+
+msgid "Already Invoiced"
+msgstr "Bereits abgerechnet"
+
+msgid "Draft Created"
+msgstr "Entwurf erstellt"
+
+msgid "Invoiced"
+msgstr "Abgerechnet"

@@ -1,20 +1,20 @@
-# Translations template for Working Time.
+# Translations template for JITIS Work.
 # Copyright (C) 2026 JITISio GmbH
 # This file is distributed under the same license as the Working Time project.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time VERSION\n"
+"Project-Id-Version: JITIS Work 1.6.1\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
-"POT-Creation-Date: 2026-03-27 14:57+0053\n"
-"PO-Revision-Date: 2026-03-27 14:57+0053\n"
-"Last-Translator: info@jitis.io\n"
-"Language-Team: info@jitis.io\n"
+"POT-Creation-Date: 2026-08-17 00:00+0000\n"
+"PO-Revision-Date: 2026-08-17 00:00+0000\n"
+"Last-Translator: JITIS <info@jitis.io>\n"
+"Language-Team: JITIS <info@jitis.io>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.13.1\n"
+"Generated-By: Babel 2.18.0\n"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
@@ -313,4 +313,262 @@ msgstr ""
 #. Count format of shortcut in the Time Tracking Workspace
 #: working_time/working_time/workspace/time_tracking/time_tracking.json
 msgid "{} Drafts"
+msgstr ""
+
+msgid "Work Cockpit"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
+msgid "Unbilled"
+msgstr ""
+
+msgid "All open"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Work item"
+msgstr ""
+
+msgid "Due"
+msgstr ""
+
+msgid "Operational State"
+msgstr ""
+
+msgid "Planned Date"
+msgstr ""
+
+msgid "Issue Attachments"
+msgstr ""
+
+msgid "One or more external providers could not be loaded. Native work remains available."
+msgstr ""
+
+msgid "No work items in this view."
+msgstr ""
+
+msgid "JITIS Work"
+msgstr ""
+
+msgid "My Work"
+msgstr ""
+
+msgid "My work"
+msgstr ""
+
+msgid "What needs your attention?"
+msgstr ""
+
+msgid "Tickets, planned tasks and billable work in one calm overview."
+msgstr ""
+
+msgid "New task"
+msgstr ""
+
+msgid "Loading work…"
+msgstr ""
+
+msgid "My Work could not be loaded."
+msgstr ""
+
+msgid "Try again"
+msgstr ""
+
+msgid "Tickets"
+msgstr ""
+
+msgid "Without date"
+msgstr ""
+
+msgid "Blocked"
+msgstr ""
+
+msgid "Waiting for customer"
+msgstr ""
+
+msgid "Search work"
+msgstr ""
+
+msgid "Search title, description, customer or project…"
+msgstr ""
+
+msgid "All types"
+msgstr ""
+
+msgid "Tasks"
+msgstr ""
+
+msgid "GitHub / external"
+msgstr ""
+
+msgid "All projects"
+msgstr ""
+
+msgid "All priorities"
+msgstr ""
+
+msgid "Mine"
+msgstr ""
+
+msgid "Team"
+msgstr ""
+
+msgid "{0} work items shown"
+msgstr ""
+
+msgid "{0} entries"
+msgstr ""
+
+msgid "Nothing is waiting here."
+msgstr ""
+
+msgid "Change the filters or capture the next task directly."
+msgstr ""
+
+msgid "Overdue"
+msgstr ""
+
+msgid "Upcoming"
+msgstr ""
+
+msgid "Ticket"
+msgstr ""
+
+msgid "Task"
+msgstr ""
+
+msgid "External"
+msgstr ""
+
+msgid "Ticket {0}"
+msgstr ""
+
+msgid "{0} h booked"
+msgstr ""
+
+msgid "Book time"
+msgstr ""
+
+msgid "Plan as task"
+msgstr ""
+
+msgid "Complete"
+msgstr ""
+
+msgid "Open {0}"
+msgstr ""
+
+msgid "Overdue: {0}"
+msgstr ""
+
+msgid "Unassigned"
+msgstr ""
+
+msgid "{0} assignees"
+msgstr ""
+
+msgid "Create or reopen a project before adding tasks."
+msgstr ""
+
+msgid "Title"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "Due date"
+msgstr ""
+
+msgid "Priority"
+msgstr ""
+
+msgid "Create task"
+msgstr ""
+
+msgid "Task created"
+msgstr ""
+
+msgid "Mark “{0}” as completed?"
+msgstr ""
+
+msgid "Task completed"
+msgstr ""
+
+msgid "Plan ticket as task"
+msgstr ""
+
+msgid "An external source is currently unavailable. Your ERPNext work remains usable."
+msgstr ""
+
+msgid "No work item selected."
+msgstr ""
+
+msgid "This ticket has more than one possible customer project. Booked time remains in the daily draft until you select the correct project."
+msgstr ""
+
+msgid "Time cannot be booked to a cancelled task."
+msgstr ""
+
+msgid "Platform Operations"
+msgstr ""
+
+msgid "Platform Operations Settings"
+msgstr ""
+
+msgid "Time Tracking"
+msgstr ""
+
+msgid "Billing Review"
+msgstr ""
+
+msgid "High"
+msgstr ""
+
+msgid "Low"
+msgstr ""
+
+msgid "Medium"
+msgstr ""
+
+msgid "Project"
+msgstr ""
+
+msgid "Projects"
+msgstr ""
+
+msgid "Urgent"
+msgstr ""
+
+msgid "Eligible"
+msgstr ""
+
+msgid "Missing Project"
+msgstr ""
+
+msgid "Missing Customer"
+msgstr ""
+
+msgid "Missing Sales Order"
+msgstr ""
+
+msgid "Locked"
+msgstr ""
+
+msgid "Already Drafted"
+msgstr ""
+
+msgid "Already Invoiced"
+msgstr ""
+
+msgid "Draft Created"
+msgstr ""
+
+msgid "Invoiced"
 msgstr ""

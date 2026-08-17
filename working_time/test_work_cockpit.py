@@ -1,10 +1,13 @@
 import json
+import re
 import sys
 import types
 import unittest
 from datetime import date
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+from babel.messages.pofile import read_po
 
 from working_time.test_platform_operations import FakeDocument, _bootstrap_frappe_stub
 
@@ -98,6 +101,10 @@ class TestWorkCockpit(unittest.TestCase):
 
 		self.assertEqual(page["name"], "work-cockpit")
 		self.assertEqual(page["title"], "My Work")
+		self.assertEqual(workspace["name"], "Platform Operations")
+		self.assertEqual(workspace["label"], "Platform Operations")
+		self.assertEqual(workspace["title"], "Platform Operations")
+		self.assertIn("JITIS Work", workspace["content"])
 		self.assertEqual(app_title, "JITIS Work")
 		self.assertEqual(app_include_css, "/assets/working_time/css/jitis_work.css")
 		self.assertIn(
@@ -113,6 +120,41 @@ class TestWorkCockpit(unittest.TestCase):
 			},
 			workspace["links"],
 		)
+
+	def test_german_catalog_covers_every_work_cockpit_label_and_stable_workspace_name(self):
+		package = Path(__file__).parent
+		with (package / "locale" / "de.po").open("rb") as source:
+			catalog = read_po(source)
+		translations = {message.id: message.string for message in catalog if message.id}
+		with (package / "locale" / "en.po").open("rb") as source:
+			english_catalog = read_po(source)
+			english_translations = {message.id: message.string for message in english_catalog if message.id}
+		with (package / "locale" / "main.pot").open("rb") as source:
+			template_catalog = read_po(source)
+			template_messages = {message.id for message in template_catalog if message.id}
+		cockpit = (package / "working_time" / "page" / "work_cockpit" / "work_cockpit.js").read_text()
+		messages = set(re.findall(r'__\("([^"]+)"', cockpit))
+		billing_review_item = json.loads(
+			(
+				package / "working_time" / "doctype" / "billing_review_item" / "billing_review_item.json"
+			).read_text()
+		)
+		billing_statuses = next(
+			set(field["options"].splitlines())
+			for field in billing_review_item["fields"]
+			if field["fieldname"] == "status"
+		)
+		messages.update(billing_statuses)
+
+		self.assertEqual(translations["Platform Operations"], "JITIS Work")
+		self.assertEqual(translations["Time Tracking"], "Zeiterfassung")
+		self.assertEqual(translations["Platform Operations Settings"], "JITIS-Work-Einstellungen")
+		self.assertEqual(english_translations["Platform Operations"], "JITIS Work")
+		self.assertEqual(english_translations["Platform Operations Settings"], "JITIS Work Settings")
+		self.assertEqual(messages - translations.keys(), set())
+		self.assertTrue(all(translations[message] for message in messages))
+		self.assertEqual(set(translations) - template_messages, set())
+		self.assertEqual(set(english_translations) - template_messages, set())
 
 	def test_permission_aware_subquery_fails_closed_without_breaking_other_sources(self):
 		with patch(
