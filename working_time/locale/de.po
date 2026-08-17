@@ -11,6 +11,7 @@ msgstr ""
 "PO-Revision-Date: 2026-03-27 14:57+0053\n"
 "Last-Translator: hallo@alyf.de\n"
 "Language-Team: hallo@alyf.de\n"
+"Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -19,37 +20,37 @@ msgstr ""
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "0%"
-msgstr ""
+msgstr "0%"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "100%"
-msgstr ""
+msgstr "100%"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "125%"
-msgstr ""
+msgstr "125%"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "150%"
-msgstr ""
+msgstr "150%"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "25%"
-msgstr ""
+msgstr "25%"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "50%"
-msgstr ""
+msgstr "50%"
 
 #. Option for the 'Billable' (Select) field in DocType 'Working Time Log'
 #: working_time/working_time/doctype/working_time_log/working_time_log.json
 msgid "75%"
-msgstr ""
+msgstr "75%"
 
 #. Content of the 'note_explainer' (HTML) field in DocType 'Working Time'
 #: working_time/working_time/doctype/working_time/working_time.json
@@ -363,3 +364,165 @@ msgstr "Mindestens ein externer Anbieter konnte nicht geladen werden. Die native
 
 msgid "No work items in this view."
 msgstr "Keine Vorgänge in dieser Ansicht."
+
+msgid "JITIS Work"
+msgstr "JITIS Work"
+
+msgid "My Work"
+msgstr "Meine Arbeit"
+
+msgid "My work"
+msgstr "Meine Arbeit"
+
+msgid "What needs your attention?"
+msgstr "Was braucht deine Aufmerksamkeit?"
+
+msgid "Tickets, planned tasks and billable work in one calm overview."
+msgstr "Tickets, geplante Aufgaben und abrechenbare Arbeit in einer ruhigen Übersicht."
+
+msgid "New task"
+msgstr "Neue Aufgabe"
+
+msgid "Loading work…"
+msgstr "Arbeit wird geladen…"
+
+msgid "My Work could not be loaded."
+msgstr "Meine Arbeit konnte nicht geladen werden."
+
+msgid "Try again"
+msgstr "Erneut versuchen"
+
+msgid "Tickets"
+msgstr "Tickets"
+
+msgid "Without date"
+msgstr "Ohne Termin"
+
+msgid "Blocked"
+msgstr "Blockiert"
+
+msgid "Waiting for customer"
+msgstr "Wartet auf Kunde"
+
+msgid "Search work"
+msgstr "Arbeit durchsuchen"
+
+msgid "Search title, description, customer or project…"
+msgstr "Titel, Beschreibung, Kunde oder Projekt suchen…"
+
+msgid "All types"
+msgstr "Alle Typen"
+
+msgid "Tasks"
+msgstr "Aufgaben"
+
+msgid "GitHub / external"
+msgstr "GitHub / extern"
+
+msgid "All projects"
+msgstr "Alle Projekte"
+
+msgid "All priorities"
+msgstr "Alle Prioritäten"
+
+msgid "Mine"
+msgstr "Meine"
+
+msgid "Team"
+msgstr "Team"
+
+msgid "{0} work items shown"
+msgstr "{0} Vorgänge werden angezeigt"
+
+msgid "{0} entries"
+msgstr "{0} Einträge"
+
+msgid "Nothing is waiting here."
+msgstr "Hier wartet gerade nichts."
+
+msgid "Change the filters or capture the next task directly."
+msgstr "Ändere die Filter oder erfasse die nächste Aufgabe direkt."
+
+msgid "Overdue"
+msgstr "Überfällig"
+
+msgid "Upcoming"
+msgstr "Demnächst"
+
+msgid "Ticket"
+msgstr "Ticket"
+
+msgid "Task"
+msgstr "Aufgabe"
+
+msgid "External"
+msgstr "Extern"
+
+msgid "Ticket {0}"
+msgstr "Ticket {0}"
+
+msgid "{0} h booked"
+msgstr "{0} h gebucht"
+
+msgid "Book time"
+msgstr "Zeit buchen"
+
+msgid "Plan as task"
+msgstr "Als Aufgabe planen"
+
+msgid "Complete"
+msgstr "Erledigen"
+
+msgid "Open {0}"
+msgstr "{0} öffnen"
+
+msgid "Overdue: {0}"
+msgstr "Überfällig: {0}"
+
+msgid "Unassigned"
+msgstr "Nicht zugewiesen"
+
+msgid "{0} assignees"
+msgstr "{0} Zuständige"
+
+msgid "Create or reopen a project before adding tasks."
+msgstr "Erstelle oder öffne ein Projekt, bevor du Aufgaben hinzufügst."
+
+msgid "Title"
+msgstr "Titel"
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Due date"
+msgstr "Fällig am"
+
+msgid "Priority"
+msgstr "Priorität"
+
+msgid "Create task"
+msgstr "Aufgabe erstellen"
+
+msgid "Task created"
+msgstr "Aufgabe erstellt"
+
+msgid "Mark “{0}” as completed?"
+msgstr "„{0}“ als erledigt markieren?"
+
+msgid "Task completed"
+msgstr "Aufgabe erledigt"
+
+msgid "Plan ticket as task"
+msgstr "Ticket als Aufgabe planen"
+
+msgid "An external source is currently unavailable. Your ERPNext work remains usable."
+msgstr "Eine externe Quelle ist derzeit nicht erreichbar. Deine ERPNext-Arbeit bleibt nutzbar."
+
+msgid "No work item selected."
+msgstr "Kein Vorgang ausgewählt."
+
+msgid "This ticket has more than one possible customer project. Booked time remains in the daily draft until you select the correct project."
+msgstr "Für dieses Ticket kommen mehrere Kundenprojekte infrage. Die gebuchte Zeit bleibt im Tagesentwurf, bis du das richtige Projekt auswählst."
+
+msgid "Time cannot be booked to a cancelled task."
+msgstr "Auf eine stornierte Aufgabe kann keine Zeit gebucht werden."

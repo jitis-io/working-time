@@ -3,7 +3,7 @@
  "module": "Working Time",
  "name": "work-cockpit",
  "page_name": "work-cockpit",
- "title": "Work Cockpit",
+ "title": "My Work",
  "standard": "Yes",
  "roles": [
   {"role": "Employee"},

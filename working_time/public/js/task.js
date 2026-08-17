@@ -1,6 +1,12 @@
 frappe.ui.form.on("Task", {
 	async refresh(frm) {
-		if (frm.is_new() || !frm.doc.issue) return;
+		if (frm.is_new()) return;
+		if (frm.doc.project && !["Completed", "Cancelled"].includes(frm.doc.status)) {
+			frm.add_custom_button(__("Book time"), () => {
+				window.location.href = `/app/working-time-quick-entry?task=${encodeURIComponent(frm.doc.name)}`;
+			});
+		}
+		if (!frm.doc.issue) return;
 		const files = await frappe.xcall("working_time.work_cockpit.get_issue_attachments", {
 			task: frm.doc.name,
 		});

@@ -1,6 +1,10 @@
-# Working Time
+# JITIS Work
 
-Time tracking, project operations and billing review for ERPNext v16.
+Work management, time tracking and billing review for ERPNext v16.
+
+The technical app and Python package remain named `working_time` for upgrade compatibility. The
+user-facing product is **JITIS Work** because its scope now covers daily work, projects, tickets,
+tasks, time and billing rather than time tracking alone.
 
 ## Who is this for?
 
@@ -21,6 +25,8 @@ portal identity and customer isolation remain outside this app.
 - Uses ERPNext Tasks and local customer notes for Timesheet descriptions
 - Provides a permission-safe **Work Cockpit** for assigned ERPNext Issues and Tasks with Today,
   Blocked, Waiting for Customer and Unbilled views
+- Provides the responsive **My Work** home for a personal backlog, descriptions, search, filters,
+  due-date groups, quick task creation, task completion and direct time booking
 - Promotes an Issue to one idempotently linked Task while retaining the Issue as the attachment source
 - Shows commercial Project context from Contract, Sales Order, Billing Review and Sales Invoice
 - Creates and submits one ERPNext **Timesheet** per employee/day/project after the complete day is validated
@@ -58,6 +64,26 @@ portal identity and customer isolation remain outside this app.
     - distribute the complete net duration across Projects, Tasks or Issues,
     - add a customer description and an internal note where useful
 - Submit your **Working Time**
+
+## Operating model
+
+JITIS Work deliberately keeps ERPNext's native records instead of introducing a second project
+management model:
+
+- A **Project** is the durable context: a customer order or support agreement, or one internal
+  umbrella project. Do not create a Project for every small request.
+- An **Issue** is incoming work: a portal ticket, fault, request or question. Quick support can be
+  handled and time-booked directly on the Issue.
+- A **Task** is consciously planned work. It may be large or small. Promote an Issue when it needs
+  scheduling, several steps or progress tracking; create simple internal Tasks directly in **My Work**.
+  Completing the last Task does not close an Internal umbrella Project; that Project stays available
+  as the durable container for the next internal Task.
+- **Working Time** records what actually happened. It is not the backlog.
+- **Billing Review** turns eligible Time and Material entries into invoice drafts.
+
+Open **JITIS Work > My Work** for daily operation. The default scope is the current user's real
+assignments even for System Managers; the team scope is an explicit switch. Undated Tasks remain
+visible under **Without date** instead of disappearing from the daily view.
 
 ## Further Reading
 
@@ -126,11 +152,13 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
   concurrent requests reuse the existing Task, and private Issue files remain linked rather than copied.
 - The optional `work_cockpit_providers` hook lets an installed app add external items without modifying
   this app. A provider is called as `provider(view=<view>, user=<session-user>)` and returns dictionaries
-  with required `external_id` and `title` keys. Optional normalized keys are `source`, `status`,
-  `priority`, `customer`, `project`, `due_date`, `operational_state`, `assigned_to`, `route`,
+  with required `external_id` and `title` keys. Optional normalized keys are `description`, `source`, `status`,
+  `priority`, `customer`, `project`, `due_date`, `operational_state`, `assigned_to`, `is_personal`, `route`,
   `actual_hours`, `worked_today`, `billing_statuses`, `unbilled`, `commercial_context`,
   `promotion_method` and `promotion_args`. Providers must enforce their own permissions; one provider
   failure is logged and isolated from native work and other providers.
+  Providers must set `is_personal` only when the item belongs to the requested ERPNext user; external
+  items without that positive assertion appear only in the explicit System Manager team scope.
 - This release does not install or activate any external provider and does not change the production
   ERP image lock.
 
@@ -148,6 +176,21 @@ Version 1.2.0 completes the forward-only consolidation on ERPNext:
 - The daily stale-draft job sends one reminder per employee instead of one message per old draft.
 - Time rows beginning exactly at midnight now retain their calculated duration.
 - This patch has no schema migration and follows the normal tested application release path.
+
+## Upgrade to 1.6.0
+
+- The user-facing app is now **JITIS Work** while the technical app ID remains `working_time`.
+- **My Work** replaces the prototype table with a responsive, grouped working list. It loads all
+  assigned open work once, then applies view, search, type, project and priority filters immediately.
+- Personal scope stays personal for System Managers. The all-team scope is explicit and remains
+  restricted to System Managers.
+- Native Issue and Task descriptions are visible as safe two-line previews. Provider descriptions
+  are allowlisted as plain text.
+- Tasks can be created, assigned to the current user, completed and time-booked without leaving the
+  work overview. Completion records the date and user, while Internal umbrella Projects remain open.
+  Issue time booking remains backward-compatible.
+- Installation/migration force-syncs the renamed Page and Workspace metadata and builds the new
+  scoped Desk stylesheet through the normal immutable ERP release.
 
 ### Origin and ALYF attribution
 

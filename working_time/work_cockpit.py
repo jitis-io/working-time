@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 from collections.abc import Callable
 from typing import Any
@@ -9,7 +10,11 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
-from working_time.permissions import is_system_manager, require_time_booking_identity
+from working_time.permissions import (
+	get_user_employee,
+	is_system_manager,
+	require_time_booking_identity,
+)
 from working_time.platform_operations import (
 	_billing_source_references,
 	_billing_status,
@@ -21,13 +26,16 @@ OPEN_TASK_STATUSES = ("Open", "Working", "Pending Review", "Overdue")
 OPERATIONAL_STATES = ("Normal", "Blockiert", "Wartet auf Kunde")
 UNBILLED_STATUSES = ("Eligible", "Missing Project", "Missing Customer", "Missing Sales Order", "Locked")
 VALID_VIEWS = ("today", "blocked", "waiting_customer", "unbilled", "all")
+VALID_SCOPES = ("mine", "team")
 MAX_NATIVE_ITEMS = 500
 MAX_EXTERNAL_ITEMS = 500
+MAX_DESCRIPTION_LENGTH = 4000
+TASK_PRIORITIES = ("Low", "Medium", "High", "Urgent")
 
 
-def _assigned_filters(statuses: tuple[str, ...], user: str) -> dict[str, Any]:
+def _assigned_filters(statuses: tuple[str, ...], user: str, scope: str = "mine") -> dict[str, Any]:
 	filters: dict[str, Any] = {"status": ["in", list(statuses)]}
-	if not is_system_manager(user):
+	if scope == "mine" or not is_system_manager(user):
 		# _assign is maintained by Frappe as a JSON array. Matching the quoted
 		# identity avoids collisions between similarly named users. Escape SQL
 		# LIKE metacharacters in otherwise valid User IDs such as `first_last`.
@@ -49,6 +57,19 @@ def _parse_assignments(value: str | list[str] | None) -> list[str]:
 	return [str(user) for user in parsed] if isinstance(parsed, list) else []
 
 
+def _bounded_description(value: Any) -> str:
+	return str(value or "")[:MAX_DESCRIPTION_LENGTH]
+
+
+def _date_string(value: Any) -> str | None:
+	if not value:
+		return None
+	try:
+		return str(getdate(value))
+	except (TypeError, ValueError):
+		return None
+
+
 def _permission_aware_list(doctype: str, **kwargs: Any) -> list[Any]:
 	try:
 		return frappe.get_list(doctype, **kwargs)
@@ -56,13 +77,14 @@ def _permission_aware_list(doctype: str, **kwargs: Any) -> list[Any]:
 		return []
 
 
-def _get_native_items(user: str) -> list[dict[str, Any]]:
+def _get_native_items(user: str, scope: str = "mine") -> list[dict[str, Any]]:
 	issues = _permission_aware_list(
 		"Issue",
-		filters=_assigned_filters(OPEN_ISSUE_STATUSES, user),
+		filters=_assigned_filters(OPEN_ISSUE_STATUSES, user, scope),
 		fields=[
 			"name",
 			"subject",
+			"description",
 			"customer",
 			"project",
 			"priority",
@@ -77,10 +99,11 @@ def _get_native_items(user: str) -> list[dict[str, Any]]:
 	)
 	tasks = _permission_aware_list(
 		"Task",
-		filters=_assigned_filters(OPEN_TASK_STATUSES, user),
+		filters=_assigned_filters(OPEN_TASK_STATUSES, user, scope),
 		fields=[
 			"name",
 			"subject",
+			"description",
 			"project",
 			"issue",
 			"priority",
@@ -104,11 +127,13 @@ def _get_native_items(user: str) -> list[dict[str, Any]]:
 				"item_type": "Issue",
 				"name": issue.name,
 				"title": issue.subject,
+				"description": _bounded_description(issue.description),
 				"status": issue.status,
 				"priority": issue.priority,
 				"customer": issue.customer or project.get("customer"),
 				"project": issue.project,
-				"due_date": issue.working_time_planned_date,
+				"project_name": project.get("project_name"),
+				"due_date": _date_string(issue.working_time_planned_date),
 				"operational_state": issue.working_time_operational_state or "Normal",
 				"assigned_to": _parse_assignments(issue.get("_assign")),
 				"route": f"/app/issue/{issue.name}",
@@ -128,12 +153,14 @@ def _get_native_items(user: str) -> list[dict[str, Any]]:
 				"item_type": "Task",
 				"name": task.name,
 				"title": task.subject,
+				"description": _bounded_description(task.description),
 				"status": task.status,
 				"priority": task.priority,
 				"customer": project.get("customer"),
 				"project": task.project,
+				"project_name": project.get("project_name"),
 				"issue": task.issue,
-				"due_date": task.exp_end_date or task.exp_start_date,
+				"due_date": _date_string(task.exp_end_date or task.exp_start_date),
 				"operational_state": task.working_time_operational_state or "Normal",
 				"assigned_to": _parse_assignments(task.get("_assign")),
 				"route": f"/app/task/{task.name}",
@@ -339,9 +366,13 @@ def _normalize_external_item(value: Any, provider: str) -> dict[str, Any] | None
 	assigned_to = value.get("assigned_to") or []
 	if isinstance(assigned_to, str):
 		assigned_to = [assigned_to]
+	elif not isinstance(assigned_to, (list, tuple, set)):
+		assigned_to = []
 	billing_statuses = value.get("billing_statuses") or []
 	if isinstance(billing_statuses, str):
 		billing_statuses = [billing_statuses]
+	elif not isinstance(billing_statuses, (list, tuple, set)):
+		billing_statuses = []
 	promotion_method = value.get("promotion_method")
 	if not isinstance(promotion_method, str):
 		promotion_method = None
@@ -354,6 +385,8 @@ def _normalize_external_item(value: Any, provider: str) -> dict[str, Any] | None
 	invoice_names = commercial_context.get("sales_invoices") or []
 	if isinstance(invoice_names, str):
 		invoice_names = [invoice_names]
+	elif not isinstance(invoice_names, (list, tuple, set)):
+		invoice_names = []
 	commercial_context = {
 		"contract": str(commercial_context["contract"]) if commercial_context.get("contract") else None,
 		"sales_order": (
@@ -371,13 +404,17 @@ def _normalize_external_item(value: Any, provider: str) -> dict[str, Any] | None
 		"item_type": "External",
 		"name": str(value["external_id"]),
 		"title": str(value["title"]),
+		"description": _bounded_description(value.get("description")),
+		"description_is_plain_text": True,
 		"status": str(value.get("status") or "Open"),
-		"priority": value.get("priority"),
-		"customer": value.get("customer"),
-		"project": value.get("project"),
+		"priority": str(value["priority"]) if value.get("priority") else None,
+		"customer": str(value["customer"]) if value.get("customer") else None,
+		"project": str(value["project"]) if value.get("project") else None,
+		"project_name": str(value["project_name"]) if value.get("project_name") else None,
 		"due_date": due_date,
 		"operational_state": state,
 		"assigned_to": [str(user) for user in assigned_to],
+		"is_personal": value.get("is_personal") is True,
 		"route": route,
 		"can_promote": bool(promotion_method),
 		"promotion_method": promotion_method,
@@ -408,16 +445,31 @@ def _get_external_items(view: str, user: str) -> tuple[list[dict[str, Any]], lis
 
 
 @frappe.whitelist()
-def get_work_cockpit(view: str = "today") -> dict[str, Any]:
-	user = require_time_booking_identity()
+def get_work_cockpit(view: str = "today", scope: str = "mine") -> dict[str, Any]:
 	if view not in VALID_VIEWS:
 		frappe.throw(_("Invalid Work Cockpit view."))
-	native_items = _filter_view(_get_native_items(user), view)
+	if scope not in VALID_SCOPES:
+		frappe.throw(_("Invalid Work Cockpit scope."))
+	user = require_time_booking_identity()
+	if scope == "team" and not is_system_manager(user):
+		frappe.throw(_("Only System Managers may open the team scope."), frappe.PermissionError)
+	native_items = _filter_view(_get_native_items(user, scope), view)
 	external_items, provider_errors = _get_external_items(view, user)
+	if scope == "mine":
+		external_items = [item for item in external_items if item.get("is_personal")]
 	items = [*native_items, *_filter_view(external_items, view)]
 	items.sort(key=lambda item: (str(item.get("due_date") or "9999-12-31"), item["title"].lower()))
+	capabilities = {
+		"can_create_task": bool(frappe.has_permission("Task", "create")),
+		"can_update_task": bool(frappe.has_permission("Task", "write")),
+		"can_book_time": bool(get_user_employee(user))
+		and bool(frappe.has_permission("Working Time", "create")),
+	}
 	return {
 		"view": view,
+		"scope": scope,
+		"can_view_team": is_system_manager(user),
+		"capabilities": capabilities,
 		"items": items,
 		"provider_errors": provider_errors,
 		"counts": {
@@ -426,6 +478,125 @@ def get_work_cockpit(view: str = "today") -> dict[str, Any]:
 			"external": sum(item["item_type"] == "External" for item in items),
 		},
 	}
+
+
+def _quick_task_projects() -> list[Any]:
+	return _permission_aware_list(
+		"Project",
+		filters={"status": "Open"},
+		fields=["name", "project_name", "customer", "project_type"],
+		order_by="project_type desc, project_name asc",
+		limit_page_length=MAX_NATIVE_ITEMS,
+	)
+
+
+@frappe.whitelist()
+def get_quick_task_context() -> dict[str, Any]:
+	require_time_booking_identity()
+	if not frappe.has_permission("Task", "create"):
+		frappe.throw(_("You are not permitted to create tasks."), frappe.PermissionError)
+	projects = _quick_task_projects()
+	internal_projects = [project for project in projects if project.project_type == "Internal"]
+	default_project = internal_projects[0].name if len(internal_projects) == 1 else None
+	if not default_project and len(projects) == 1:
+		default_project = projects[0].name
+	return {
+		"default_project": default_project,
+		"projects": [
+			{
+				"name": project.name,
+				"project_name": project.project_name,
+				"customer": project.customer,
+				"project_type": project.project_type,
+			}
+			for project in projects
+		],
+	}
+
+
+def _safe_task_description(value: str | None) -> str | None:
+	value = str(value or "").strip()
+	if not value:
+		return None
+	return f"<p>{html.escape(value).replace(chr(10), '<br>')}</p>"
+
+
+@frappe.whitelist()
+def create_quick_task(
+	subject: str,
+	project: str,
+	description: str | None = None,
+	due_date: str | None = None,
+	priority: str = "Medium",
+) -> dict[str, Any]:
+	user = require_time_booking_identity()
+	if not frappe.has_permission("Task", "create"):
+		frappe.throw(_("You are not permitted to create tasks."), frappe.PermissionError)
+	subject = str(subject or "").strip()
+	if not subject:
+		frappe.throw(_("Enter a task title."))
+	if len(subject) > 140:
+		frappe.throw(_("Task titles may contain at most 140 characters."))
+	if priority not in TASK_PRIORITIES:
+		frappe.throw(_("Invalid task priority."))
+	project = str(project or "").strip()
+	if not project:
+		frappe.throw(_("Select an open project."))
+	project_doc = frappe.get_doc("Project", project)
+	if not frappe.has_permission("Project", "read", doc=project_doc):
+		frappe.throw(_("You are not permitted to use this project."), frappe.PermissionError)
+	if project_doc.status != "Open":
+		frappe.throw(_("Select an open project."))
+	task_values: dict[str, Any] = {
+		"doctype": "Task",
+		"subject": subject,
+		"description": _safe_task_description(description),
+		"project": project_doc.name,
+		"priority": priority,
+		"status": "Open",
+	}
+	if due_date:
+		try:
+			task_values["exp_end_date"] = str(getdate(due_date))
+		except (TypeError, ValueError):
+			frappe.throw(_("Invalid due date."))
+	task = frappe.get_doc(task_values).insert()
+	from frappe.desk.form.assign_to import add as assign_to
+
+	assign_to(
+		{
+			"assign_to": [user],
+			"doctype": "Task",
+			"name": task.name,
+			"description": task.subject,
+			"priority": task.priority,
+		}
+	)
+	return {"name": task.name, "route": f"/app/task/{task.name}", "created": True}
+
+
+@frappe.whitelist()
+def complete_task(task: str) -> dict[str, Any]:
+	user = require_time_booking_identity()
+	task_doc = frappe.get_doc("Task", task)
+	if not frappe.has_permission("Task", "write", doc=task_doc):
+		frappe.throw(_("You are not permitted to update this task."), frappe.PermissionError)
+	if task_doc.status == "Cancelled":
+		frappe.throw(_("A cancelled task cannot be completed."))
+	if task_doc.status == "Completed":
+		return {"name": task_doc.name, "status": task_doc.status, "changed": False}
+	completed_on = nowdate()
+	task_doc.completed_on = completed_on
+	task_doc.completed_by = user
+	task_doc.closing_date = completed_on
+	if task_doc.project and frappe.db.get_value("Project", task_doc.project, "project_type") == "Internal":
+		# Internal Projects are durable backlog containers. ERPNext normally closes
+		# a Project when its last Task is completed, which would make the one-project
+		# internal workflow unusable until someone manually reopens it.
+		task_doc.flags.from_project = True
+	task_doc.status = "Completed"
+	task_doc.save()
+	return {"name": task_doc.name, "status": task_doc.status, "changed": True}
 
 
 def _issue_with_read_access(issue: str):
