@@ -20,7 +20,7 @@ RUN apt-get update \
 		pkg-config \
 		redis-server \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& pip install frappe-bench ruff \
+	&& pip install babel frappe-bench ruff \
 	&& useradd --create-home --shell /bin/bash runner
 
 COPY --from=node /usr/local/ /usr/local/

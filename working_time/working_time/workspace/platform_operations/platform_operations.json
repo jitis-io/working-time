@@ -9,7 +9,7 @@
  "hide_custom": 1,
  "icon": "settings",
  "is_hidden": 0,
- "label": "JITIS Work",
+ "label": "Platform Operations",
  "links": [
   {"hidden": 0, "is_query_report": 0, "label": "Work", "link_count": 5, "link_type": "Page", "onboard": 0, "type": "Card Break"},
   {"hidden": 0, "is_query_report": 0, "label": "My Work", "link_count": 0, "link_to": "work-cockpit", "link_type": "Page", "onboard": 0, "type": "Link"},
@@ -38,5 +38,5 @@
   {"color": "Yellow", "doc_view": "New", "format": "{} Drafts", "label": "New Working Time", "link_to": "Working Time", "type": "DocType"},
   {"color": "Blue", "doc_view": "New", "format": "{} Drafts", "label": "New Billing Review", "link_to": "Billing Review", "type": "DocType"}
  ],
- "title": "JITIS Work"
+ "title": "Platform Operations"
 }
