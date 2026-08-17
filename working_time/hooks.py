@@ -1,7 +1,7 @@
 app_name = "working_time"
-app_title = "Working Time"
+app_title = "JITIS Work"
 app_publisher = "ALYF GmbH and JITIS contributors"
-app_description = "Time tracking, project operations and billing review for ERPNext"
+app_description = "Work management, time tracking and billing review for ERPNext"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "info@jitis.io"
@@ -12,7 +12,7 @@ required_apps = ["erpnext", "hrms"]
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/working_time/css/working_time.css"
+app_include_css = "/assets/working_time/css/jitis_work.css"
 # app_include_js = "/assets/working_time/js/working_time.js"
 
 # include js, css files in header of web template

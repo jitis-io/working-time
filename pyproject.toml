@@ -7,7 +7,7 @@ authors = [
 maintainers = [
     { name = "Jonas Jakob IT & InfoSec (JITIS)", email = "info@jitis.io" }
 ]
-description = "Time tracking, attendance and billing review in ERPNext"
+description = "Work management, time tracking and billing review in ERPNext"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

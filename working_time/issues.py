@@ -16,6 +16,24 @@ def _require_booking_access(issue: str):
 	return employee, doc
 
 
+def _task_with_read_access(task: str):
+	doc = frappe.get_doc("Task", task)
+	if not frappe.has_permission("Task", "read", doc=doc):
+		frappe.throw(_("You are not permitted to read this task."), frappe.PermissionError)
+	return doc
+
+
+def _require_task_booking_access(task: str):
+	require_time_booking_identity()
+	employee = get_user_employee()
+	if not employee:
+		frappe.throw(_("Your user account is not linked to an Employee record."), frappe.PermissionError)
+	task_doc = _task_with_read_access(task)
+	if task_doc.status == "Cancelled":
+		frappe.throw(_("Time cannot be booked to a cancelled task."))
+	return employee, task_doc
+
+
 def _issue_with_read_access(issue: str):
 	doc = frappe.get_doc("Issue", issue)
 	if not frappe.has_permission("Issue", "read", doc=doc):
@@ -83,6 +101,7 @@ def get_issue_time_context(issue: str, date: str):
 		limit_page_length=2,
 	)
 	task = tasks[0].name if len(tasks) == 1 and tasks[0].project == project else None
+	selected_project = next((row for row in projects if row.name == project), None)
 	return {
 		"issue": issue_doc.name,
 		"employee": employee,
@@ -91,30 +110,50 @@ def get_issue_time_context(issue: str, date: str):
 		"projects": projects,
 		"project": project,
 		"task": task,
+		"billable": int(bool(selected_project and selected_project.billing_model == "Time and Material")),
 		"project_ambiguous": not project and len(projects) > 1,
 	}
 
 
 @frappe.whitelist()
-def add_issue_time(
-	issue: str,
+def get_task_time_context(task: str, date: str):
+	employee, task_doc = _require_task_booking_access(task)
+	if not task_doc.project:
+		frappe.throw(_("Link the task to a project before booking time."))
+	project_doc = frappe.get_doc("Project", task_doc.project)
+	if not frappe.has_permission("Project", "read", doc=project_doc):
+		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
+	if task_doc.issue:
+		validate_issue_booking(task_doc.issue, task_doc.project, task_doc.name)
+	return {
+		"task": task_doc.name,
+		"issue": task_doc.issue,
+		"employee": employee,
+		"date": str(getdate(date)),
+		"customer": project_doc.customer,
+		"project": project_doc.name,
+		"billable": int(
+			project_doc.project_type != "Internal" and project_doc.billing_model == "Time and Material"
+		),
+	}
+
+
+def _append_time_log(
+	*,
+	employee: str,
 	date: str,
 	duration_minutes: int,
-	project: str | None = None,
-	task: str | None = None,
-	start_time: str | None = None,
-	customer_description: str | None = None,
-	internal_note: str | None = None,
-	billable: int | str = 1,
-):
-	employee, issue_doc = _require_booking_access(issue)
+	project: str | None,
+	task: str | None,
+	issue: str | None,
+	start_time: str | None,
+	customer_description: str | None,
+	internal_note: str | None,
+	billable: int | str,
+) -> dict[str, str]:
 	duration_minutes = cint(duration_minutes)
 	if duration_minutes <= 0:
 		frappe.throw(_("Duration must be greater than zero."))
-	context = get_issue_time_context(issue_doc.name, date)
-	project = project or context.get("project")
-	task = task or (context.get("task") if project else None)
-	validate_issue_booking(issue_doc.name, project, task)
 	working_time = get_or_create_daily_working_time(employee, date)
 	doc = frappe.get_doc("Working Time", working_time.name)
 	from_time = to_time = None
@@ -134,7 +173,7 @@ def add_issue_time(
 			"to_time": to_time,
 			"project": project,
 			"task": task,
-			"issue": issue_doc.name,
+			"issue": issue,
 			"customer_description": customer_description,
 			"internal_note": internal_note,
 			"billable": "100%" if cint(billable) else "0%",
@@ -142,3 +181,60 @@ def add_issue_time(
 	)
 	doc.save()
 	return {"working_time": doc.name, "route": f"/app/working-time/{doc.name}"}
+
+
+@frappe.whitelist()
+def add_issue_time(
+	issue: str,
+	date: str,
+	duration_minutes: int,
+	project: str | None = None,
+	task: str | None = None,
+	start_time: str | None = None,
+	customer_description: str | None = None,
+	internal_note: str | None = None,
+	billable: int | str = 1,
+):
+	employee, issue_doc = _require_booking_access(issue)
+	context = get_issue_time_context(issue_doc.name, date)
+	project = project or context.get("project")
+	task = task or (context.get("task") if project else None)
+	validate_issue_booking(issue_doc.name, project, task)
+	return _append_time_log(
+		employee=employee,
+		date=date,
+		duration_minutes=duration_minutes,
+		project=project,
+		task=task,
+		issue=issue_doc.name,
+		start_time=start_time,
+		customer_description=customer_description,
+		internal_note=internal_note,
+		billable=billable,
+	)
+
+
+@frappe.whitelist()
+def add_task_time(
+	task: str,
+	date: str,
+	duration_minutes: int,
+	start_time: str | None = None,
+	customer_description: str | None = None,
+	internal_note: str | None = None,
+	billable: int | str = 0,
+):
+	employee, task_doc = _require_task_booking_access(task)
+	context = get_task_time_context(task_doc.name, date)
+	return _append_time_log(
+		employee=employee,
+		date=date,
+		duration_minutes=duration_minutes,
+		project=context["project"],
+		task=task_doc.name,
+		issue=task_doc.issue,
+		start_time=start_time,
+		customer_description=customer_description,
+		internal_note=internal_note,
+		billable=billable,
+	)
