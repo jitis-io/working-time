@@ -56,13 +56,6 @@ frappe.pages["working-time-quick-entry"].on_page_load = async function (wrapper)
 				default: context.date,
 			},
 			{
-				fieldname: "start_time",
-				fieldtype: "Time",
-				label: __("Start time"),
-				reqd: 1,
-				default: frappe.datetime.now_time(),
-			},
-			{
 				fieldname: "duration_minutes",
 				fieldtype: "Int",
 				label: __("Duration (minutes)"),

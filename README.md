@@ -97,6 +97,10 @@ Project provisioning creates or links an ERPNext Project after an explicit previ
 
 Run Docker quality and clean-bench integration checks before committing; see AGENTS.md.
 
+The Issue and Task quick entry is duration-first. Record only the minutes spent while working. Set
+the complete workday start, end and break once on the daily Working Time document before submitting
+it; do not create native Timesheets manually.
+
 ## Production releases
 
 Do not run `bench update`, pull a branch or replace this app directly in the

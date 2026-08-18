@@ -2,6 +2,7 @@ import sys
 import types
 import unittest
 from datetime import date, time
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -29,6 +30,18 @@ from working_time.issues import add_task_time, get_task_time_context, validate_i
 
 
 class TestIssueBooking(unittest.TestCase):
+	def test_quick_entry_is_duration_first(self):
+		quick_entry = (
+			Path(__file__).parent
+			/ "working_time"
+			/ "page"
+			/ "working_time_quick_entry"
+			/ "working_time_quick_entry.js"
+		).read_text()
+
+		self.assertIn('fieldname: "duration_minutes"', quick_entry)
+		self.assertNotIn('fieldname: "start_time"', quick_entry)
+
 	def test_direct_working_time_booking_requires_issue_read_permission(self):
 		issue = SimpleNamespace(name="ISS-2026-00001", customer=None)
 
