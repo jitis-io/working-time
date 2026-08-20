@@ -5,8 +5,12 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 OBSOLETE_CUSTOM_FIELDS = {
+	# The legacy Sales Order field is retired conditionally by its data-preserving patch.
 	"Customer": [
 		"customer_offboarding",
+	],
+	"Task": [
+		"working_time_issue_attachments_html",
 	],
 	"Timesheet Detail": [
 		"jira_section",
@@ -18,26 +22,80 @@ OBSOLETE_CUSTOM_FIELDS = {
 
 def after_install():
 	make_custom_fields()
+	migrate_project_time_billing()
 	insert_docs()
-	ensure_work_cockpit_metadata()
+	migrate_legacy_settings()
+	retire_legacy_navigation()
 	update_projects_settings()
+	backfill_customer_projects()
 
 
 def after_migrate():
 	make_custom_fields()
+	migrate_project_time_billing()
 	insert_docs()
-	ensure_work_cockpit_metadata()
+	migrate_legacy_settings()
+	retire_legacy_navigation()
+	backfill_customer_projects()
 
 
-def ensure_work_cockpit_metadata():
-	"""Force-sync the app-owned Desk metadata on existing sites.
+def retire_legacy_navigation():
+	"""Remove the superseded parallel work surfaces without touching business records."""
 
-	Frappe can retain a newer database copy of a standard Workspace during an
-	upgrade. Reloading both documents keeps the stable Work Cockpit route and
-	its Platform Operations link present without editing user-owned records.
-	"""
-	frappe.reload_doc("working_time", "page", "work_cockpit", force=True)
-	frappe.reload_doc("working_time", "workspace", "platform_operations", force=True)
+	for doctype, name in (
+		("Workspace", "Platform Operations"),
+		("Workspace", "Time Tracking"),
+		("Workspace Sidebar", "Platform Operations"),
+		("Workspace Sidebar", "Time Tracking"),
+		("Desktop Icon", "Platform Operations"),
+		("Desktop Icon", "Time Tracking"),
+		("Page", "work-cockpit"),
+		("Page", "working-time-quick-entry"),
+		("Number Card", "Daily Billable Time (this month)"),
+		("Number Card", "Daily Break Time (this month)"),
+		("Number Card", "Daily Project Time (this month)"),
+		("Number Card", "Working Time (this month)"),
+	):
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		if frappe.db.exists(doctype, name):
+			frappe.delete_doc(doctype, name, ignore_permissions=True, force=True)
+
+
+def migrate_legacy_settings():
+	"""Keep the configured billing item while retiring Platform Operations from daily use."""
+
+	if not frappe.db.exists("DocType", "Platform Operations Settings"):
+		return
+	current = frappe.db.get_single_value("Working Time Settings", "default_time_billing_item")
+	legacy = frappe.db.get_single_value("Platform Operations Settings", "default_time_billing_item")
+	if legacy and not current:
+		frappe.db.set_single_value("Working Time Settings", "default_time_billing_item", legacy)
+
+
+def migrate_project_time_billing():
+	"""Map the legacy four-way billing model to the simple visible time switch."""
+
+	if not frappe.db.has_column("Project", "time_billable"):
+		return
+	frappe.db.sql(
+		"""
+		update `tabProject`
+		set time_billable = 1
+		where billing_model = 'Time and Material'
+			and coalesce(time_billable, 0) = 0
+		"""
+	)
+
+
+def backfill_customer_projects():
+	if not frappe.is_setup_complete():
+		return
+	from working_time.customer_projects import backfill_customer_projects as backfill_customers
+	from working_time.customer_projects import backfill_issue_projects
+
+	backfill_customers()
+	backfill_issue_projects()
 
 
 def make_custom_fields():

@@ -1,7 +1,7 @@
 app_name = "working_time"
-app_title = "JITIS Work"
+app_title = "Working Time"
 app_publisher = "ALYF GmbH and JITIS contributors"
-app_description = "Work management, time tracking and billing review for ERPNext"
+app_description = "Project-centred time tracking and billing review for ERPNext"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "info@jitis.io"
@@ -11,9 +11,8 @@ required_apps = ["erpnext", "hrms"]
 # Includes in <head>
 # ------------------
 
-# include js, css files in header of desk.html
-app_include_css = "/assets/working_time/css/jitis_work.css"
-# app_include_js = "/assets/working_time/js/working_time.js"
+# The small shared booking dialog is used from Project, Issue and Task forms.
+app_include_js = "/assets/working_time/js/time_booking.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/working_time/css/working_time.css"
@@ -31,18 +30,15 @@ app_include_css = "/assets/working_time/css/jitis_work.css"
 
 # include js in doctype views
 doctype_js = {
-	"Sales Order": "public/js/sales_order.js",
-	"Customer Project Provisioning": "public/js/customer_project_provisioning.js",
 	"Billing Review": "public/js/billing_review.js",
-	"Platform Operations Settings": "public/js/platform_operations_settings.js",
+	"Customer": "public/js/customer.js",
 	"Issue": "public/js/issue.js",
 	"Project": "public/js/project.js",
+	"Purchase Invoice": "public/js/invoice_project.js",
+	"Sales Invoice": "public/js/invoice_project.js",
 	"Task": "public/js/task.js",
 }
 
-doctype_list_js = {
-	"Billing Review": "public/js/billing_review_list.js",
-}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -106,6 +102,24 @@ has_permission = {
 # Document Events
 # ---------------
 # Hook on document methods and events
+
+doc_events = {
+	"Customer": {
+		"after_insert": "working_time.customer_projects.after_customer_insert",
+	},
+	"Issue": {
+		"validate": "working_time.customer_projects.assign_customer_project_to_issue",
+	},
+	"Project": {
+		"validate": "working_time.customer_projects.sync_project_time_billing",
+	},
+	"Purchase Invoice": {
+		"validate": "working_time.customer_projects.apply_invoice_project",
+	},
+	"Sales Invoice": {
+		"validate": "working_time.customer_projects.apply_invoice_project",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
@@ -192,19 +206,36 @@ ignore_translatable_strings_from = ["frappe", "erpnext", "hrms"]
 working_time_custom_fields = {
 	"Project": [
 		{
+			"fieldname": "customer_account_tab",
+			"label": "Customer Account",
+			"fieldtype": "Tab Break",
+			"insert_after": "per_gross_margin",
+			"depends_on": "eval:doc.customer",
+		},
+		{
+			"fieldname": "time_billable",
+			"label": "Bill Time",
+			"fieldtype": "Check",
+			"default": "0",
+			"insert_after": "customer_account_tab",
+		},
+		{
 			"fieldname": "billing_model",
 			"label": "Billing Model",
 			"fieldtype": "Select",
 			"options": "Non-billable\nTime and Material\nFixed Price\nRecurring",
 			"default": "Non-billable",
-			"insert_after": "project_type",
+			"insert_after": "time_billable",
+			"hidden": 1,
 		},
 		{
 			"fieldname": "billing_rate",
 			"label": "Billing Rate per Hour",
 			"fieldtype": "Currency",
-			"options": "currency",
-			"insert_after": "cost_center",
+			"options": "Company:company:default_currency",
+			"insert_after": "billing_model",
+			"depends_on": "eval:doc.time_billable",
+			"mandatory_depends_on": "eval:doc.time_billable",
 			"translatable": 0,
 		},
 		{
@@ -212,7 +243,25 @@ working_time_custom_fields = {
 			"label": "Contract",
 			"fieldtype": "Link",
 			"options": "Contract",
-			"insert_after": "sales_order",
+			"insert_after": "billing_rate",
+		},
+		{
+			"fieldname": "customer_account_overview",
+			"label": "Monthly Overview",
+			"fieldtype": "HTML",
+			"insert_after": "contract",
+			"depends_on": "eval:doc.customer",
+		},
+	],
+	"Customer": [
+		{
+			"fieldname": "customer_project",
+			"label": "Customer Project",
+			"fieldtype": "Link",
+			"options": "Project",
+			"insert_after": "customer_name",
+			"read_only": 1,
+			"no_copy": 1,
 		},
 	],
 	"Issue": [
@@ -223,12 +272,14 @@ working_time_custom_fields = {
 			"options": "Normal\nBlockiert\nWartet auf Kunde",
 			"default": "Normal",
 			"insert_after": "status",
+			"hidden": 1,
 		},
 		{
 			"fieldname": "working_time_planned_date",
 			"label": "Planned Date",
 			"fieldtype": "Date",
 			"insert_after": "working_time_operational_state",
+			"hidden": 1,
 		},
 	],
 	"Task": [
@@ -239,13 +290,7 @@ working_time_custom_fields = {
 			"options": "Normal\nBlockiert\nWartet auf Kunde",
 			"default": "Normal",
 			"insert_after": "status",
-		},
-		{
-			"fieldname": "working_time_issue_attachments_html",
-			"label": "Issue Attachments",
-			"fieldtype": "HTML",
-			"insert_after": "issue",
-			"depends_on": "eval:doc.issue",
+			"hidden": 1,
 		},
 	],
 	"Timesheet": [
@@ -302,16 +347,5 @@ working_time_custom_fields = {
 			"options": "Working Time Policy",
 			"insert_after": "holiday_list",
 		}
-	],
-	"Sales Order": [
-		{
-			"fieldname": "customer_project_provisioning",
-			"label": "Customer Project Provisioning",
-			"fieldtype": "Link",
-			"options": "Customer Project Provisioning",
-			"insert_after": "customer_name",
-			"read_only": 1,
-			"translatable": 0,
-		},
 	],
 }

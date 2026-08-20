@@ -8,6 +8,7 @@
  "field_order": [
   "period_start",
   "period_end",
+  "project",
   "status",
   "items",
   "result_json",
@@ -30,6 +31,14 @@
    "label": "Period end",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project",
+   "options": "Project",
+   "read_only": 1
   },
   {
    "fieldname": "status",

@@ -6,9 +6,9 @@ cd /workspace
 
 ruff check --no-cache .
 ruff format --check --no-cache .
-node --check working_time/working_time/page/work_cockpit/work_cockpit.js
-node --check working_time/working_time/page/working_time_quick_entry/working_time_quick_entry.js
-node --check working_time/public/js/task.js
+for script in working_time/public/js/*.js; do
+	node --check "$script"
+done
 pybabel compile \
 	--input-file working_time/locale/de.po \
 	--output-file /tmp/working-time-de.mo
@@ -20,4 +20,6 @@ python -m unittest \
 	working_time.test_permissions \
 	working_time.test_reminders \
 	working_time.test_issues \
-	working_time.test_work_cockpit
+	working_time.test_customer_project_patches \
+	working_time.test_customer_projects \
+	working_time.test_project_overview

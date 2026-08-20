@@ -1,64 +1,46 @@
-# Working Time migrations
+# Migration and acceptance checklist
 
-## 1.5.1 — upgrade and invoice retry safety
+## 1.7.0 project-centred workflow
 
-1. Promote the tested immutable ERP image and run the normal site migration. The migration force-syncs
-   the app-owned `work-cockpit` Page and `Platform Operations` Workspace, so no manual force import is
-   required.
-2. Confirm that **Platform Operations > Work Cockpit** is present after a second no-op migration as well.
-3. Create a narrow Billing Review preview. Trigger draft creation once and confirm the result contains
-   `created: true`; a safe retry must return the same Sales Invoice names with `created: false`.
-4. Do not submit or send invoices automatically. Review the drafts, render `Ausgangsrechnung`, submit each
-   invoice manually, and only then finalize the Billing Review.
+Deploy only through the immutable ERP platform release. The normal `bench --site <site> migrate` step
+performs the idempotent metadata and customer-project migration.
 
-## 1.5.0 — native Work Cockpit
+Before release:
 
-1. Promote the tested immutable ERP image; do not run `bench update` or pull an app branch in production.
-2. Run the normal site migration and asset build. The migration idempotently adds the Issue/Task operational
-   state, Issue planning date, Project Contract link and Task attachment display fields.
-3. Confirm `/app/work-cockpit` as a System Manager and as one assigned Employee. The employee must not see
-   an unassigned Issue or Task, even when its role could otherwise list that DocType.
-4. Promote one Issue twice and confirm both actions route to the same open Task. Confirm private Issue files
-   are linked from that Task without creating additional `File` records.
-5. Compare **Nicht abgerechnet** with a narrow Billing Review preview. Eligible and exception states must
-   agree; invoice submission remains manual.
-6. Provider apps are optional and activated separately. A provider outage must leave native work visible.
+1. Run quality and clean-bench integration checks from `AGENTS.md`.
+2. Confirm the production backup gate is enabled in the platform workflow.
+3. Record counts for Customer, Project, open Issue, Working Time and Billing Review.
 
-## 1.3.1 — upgrade ordering hotfix
+After migration:
 
-- Existing sites now create the v1.3 Project and integration custom fields before the data backfill patch queries them.
-- Fresh installs and sites upgrading from 1.2.1 use the same migration path.
+1. `Platform Operations`, `Time Tracking`, `work-cockpit` and `working-time-quick-entry` are absent.
+2. Every non-disabled Customer has `customer_project` set.
+   On the 2026-08-20 production preflight this means 18 processed, 15 created and 3 exact Projects reused
+   and reopened.
+3. Every linked customer Project belongs to the same Customer, is open, and has the customer number as
+   its visible project name. It uses manual progress so completed Tasks do not close the account.
+4. Historical job Projects remain unchanged; no Projects are merged or deleted.
+   The verified JITIS mismatch `P-2510-0001.project_name` is corrected from `K-2601013` to its linked
+   Customer `K-2601008`; the Project record and every existing document link remain unchanged.
+5. Open customer Issues that previously had no Project point to the canonical customer Project.
+6. Existing non-default Issue or Task operational-state values still exist in hidden compatibility fields.
+7. The time-billing Item previously stored in Platform Operations Settings is present in Working Time
+   Settings.
 
-## 1.3.0 — unified Working Time and Helpdesk booking
+Functional acceptance:
 
-1. Take and verify a database backup. Ensure Helpdesk 1.28.1 and Telephony are installed.
-2. Run `bench --site <site> migrate`. The patch aborts before cleanup if a Project has conflicting native/legacy Sales Orders or if scripts/reports still reference the retired ALYF Task fields.
-3. Run `bench build --app working_time` and `bench restart`.
-4. Confirm all historical Working Time counts and submitted raw durations are unchanged. Check that no `Project-source_sales_order`, `Task-custom_is_active` or `Task-custom_hourly_billed` Custom Field remains.
-5. Configure **Working Time Settings**, Employee user mappings, Project billing models, native Sales Orders and hourly rates.
-6. Smoke-test: internal Helpdesk ticket → **Zeit buchen** → daily Working Time → complete allocation → submit → submitted Timesheet → Billing Review → draft Sales Invoice.
-7. Verify a customer project mismatch, wrong Task, missing Employee mapping and customer-portal booking attempt are rejected.
+1. Open a customer Project and verify the **Customer Account** tab at desktop and narrow widths.
+2. Book time from Project, Issue and Task. Each action must append exactly one row to the same daily
+   Working Time draft and preserve Project, Issue/Task and descriptions.
+3. Complete day close with start, end and break; submit once and verify Attendance plus Timesheet links.
+4. Create a Purchase Invoice from the Project, add an item and verify its Project. After submit, the month
+   view must include the base net amount; a draft must not count as actual cost.
+5. From the Project month view confirm **Create time invoice draft**. It must include only eligible time for
+   that Project and month, open exactly one Sales Invoice draft, and never submit or email it.
+6. Submit a reviewed Sales Invoice and verify the month view separates draft and submitted revenue.
+7. Verify users without Timesheet, Purchase Invoice or Sales Invoice read permission receive no protected
+   rows or amounts.
 
-## 1.2.0 — native ERPNext work and billing model
-
-1. Back up the ERPNext site and verify that the backup can be read before deployment.
-2. Verify **Employee > User ID** for every employee login. After this upgrade, non-System-Manager users
-   without that mapping cannot list or open Working Time records or run either Working Time report.
-3. Deploy the app and run:
-
-   ```bash
-   bench --site <site> migrate
-   bench build --app working_time
-   bench restart
-   ```
-
-4. Test with one employee login: its own record must be visible and another Employee's record must not be
-   listed, opened or accepted by either report. Test an unmapped non-System-Manager login and confirm it is
-   denied. System Managers remain unrestricted.
-5. Verify that **Platform Operations** replaces the old integration workspace and contains only native project provisioning, billing review, alert and settings links.
-6. Confirm that all retired external-integration DocTypes, custom fields, credentials and scheduled jobs are gone.
-7. Verify new Sales Order project provisioning in a disposable example. It creates only the ERPNext Project.
-8. Create a Billing Review for a narrow test period and verify the groups. Actual and raw billable hours are retained; only the daily customer/project/task aggregate is rounded upward to a quarter hour.
-9. Create invoice drafts. This changes the review to **Draft Created** and does not submit or send anything. Review and submit each Sales Invoice manually, then choose **Finalize submitted invoices**.
-
-The included post-model-sync patch changes legacy Billing Review rows from **Invoiced** to **Draft Created** when at least one linked Sales Invoice is not submitted. It does not rewrite historical Timesheet hours. Submitted historical time can only be corrected through ERPNext's cancellation/amendment workflow so the audit trail remains intact.
+Rollback is forward-only: do not downgrade the database, pull mutable branches or run `bench update` on
+the VM. Correct defects in a new app tag and platform image, or use the documented production restore
+procedure for a declared migration incident.

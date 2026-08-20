@@ -26,21 +26,21 @@ frappe_utils.getdate = getattr(
 )
 frappe.has_permission = getattr(frappe, "has_permission", lambda *args, **kwargs: True)
 
-from working_time.issues import add_task_time, get_task_time_context, validate_issue_booking
+from working_time.issues import (
+	add_task_time,
+	get_issue_time_context,
+	get_task_time_context,
+	validate_issue_booking,
+)
 
 
 class TestIssueBooking(unittest.TestCase):
 	def test_quick_entry_is_duration_first(self):
-		quick_entry = (
-			Path(__file__).parent
-			/ "working_time"
-			/ "page"
-			/ "working_time_quick_entry"
-			/ "working_time_quick_entry.js"
-		).read_text()
+		quick_entry = (Path(__file__).parent / "public" / "js" / "time_booking.js").read_text()
 
 		self.assertIn('fieldname: "duration_minutes"', quick_entry)
 		self.assertNotIn('fieldname: "start_time"', quick_entry)
+		self.assertIn("working_time.issues.book_time", quick_entry)
 
 	def test_direct_working_time_booking_requires_issue_read_permission(self):
 		issue = SimpleNamespace(name="ISS-2026-00001", customer=None)
@@ -63,13 +63,50 @@ class TestIssueBooking(unittest.TestCase):
 		):
 			validate_issue_booking(issue.name, None)
 
+	def test_issue_context_does_not_autoselect_unreadable_task(self):
+		issue = SimpleNamespace(name="ISS-2026-00003", customer="CUST-0001", project="PROJ-0001")
+		project = SimpleNamespace(
+			name="PROJ-0001",
+			project_name="Customer project",
+			customer="CUST-0001",
+			project_type="External",
+			time_billable=1,
+		)
+		with (
+			patch(
+				"working_time.issues._require_booking_access",
+				return_value=("EMP-0001", issue),
+			),
+			patch("working_time.issues.frappe.get_doc", return_value=project),
+			patch("working_time.issues.frappe.has_permission", return_value=True),
+			patch("working_time.issues.validate_issue_booking"),
+			patch(
+				"working_time.issues.frappe.get_list",
+				side_effect=frappe.PermissionError("not permitted"),
+			) as get_list,
+			patch(
+				"working_time.issues.frappe.get_all",
+				return_value=[SimpleNamespace(name="TASK-HIDDEN", project=project.name)],
+			) as get_all,
+		):
+			context = get_issue_time_context(issue.name, "2026-08-17")
+
+		self.assertIsNone(context["task"])
+		get_list.assert_called_once_with(
+			"Task",
+			filters={"issue": issue.name, "status": ("not in", ("Completed", "Cancelled"))},
+			fields=["name", "project"],
+			limit_page_length=2,
+		)
+		get_all.assert_not_called()
+
 	def test_standalone_task_time_context_uses_task_project(self):
 		task = SimpleNamespace(name="TASK-0001", project="PROJ-0001", issue=None)
 		project = SimpleNamespace(
 			name="PROJ-0001",
 			customer=None,
 			project_type="Internal",
-			billing_model="Non-billable",
+			time_billable=0,
 		)
 		with (
 			patch("working_time.issues._require_task_booking_access", return_value=("EMP-0001", task)),

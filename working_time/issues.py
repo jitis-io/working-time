@@ -7,6 +7,13 @@ from frappe.utils import cint, get_time, getdate
 from working_time.permissions import get_user_employee, require_time_booking_identity
 
 
+def _project_time_is_billable(project_doc) -> bool:
+	getter = getattr(project_doc, "get", None)
+	project_type = getter("project_type") if callable(getter) else getattr(project_doc, "project_type", None)
+	time_billable = getter("time_billable") if callable(getter) else getattr(project_doc, "time_billable", 0)
+	return project_type != "Internal" and bool(cint(time_billable))
+
+
 def _require_booking_access(issue: str):
 	require_time_booking_identity()
 	employee = get_user_employee()
@@ -49,6 +56,10 @@ def validate_issue_booking(issue: str, project: str | None, task: str | None = N
 			frappe.throw(_("A task cannot be booked without a project."))
 		return
 	project_doc = frappe.get_doc("Project", project)
+	if not frappe.has_permission("Project", "read", doc=project_doc):
+		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
+	if issue_doc.project and issue_doc.project != project:
+		frappe.throw(_("The issue is linked to another project."))
 	if issue_doc.customer:
 		if project_doc.customer != issue_doc.customer:
 			frappe.throw(_("Issue and project must belong to the same customer."))
@@ -77,41 +88,111 @@ def get_or_create_daily_working_time(employee: str, date: str):
 
 
 @frappe.whitelist()
+def get_or_create_my_working_time(date: str):
+	require_time_booking_identity()
+	employee = get_user_employee()
+	if not employee:
+		frappe.throw(_("Your user account is not linked to an Employee record."), frappe.PermissionError)
+	return get_or_create_daily_working_time(employee, date)
+
+
+@frappe.whitelist()
 def get_issue_time_context(issue: str, date: str):
 	employee, issue_doc = _require_booking_access(issue)
-	filters = {"status": "Open"}
-	if issue_doc.customer:
-		filters["customer"] = issue_doc.customer
-	else:
-		filters["project_type"] = "Internal"
-	projects = frappe.get_all(
-		"Project",
-		filters=filters,
-		fields=["name", "project_name", "customer", "project_type", "billing_model"],
-	)
 	project = issue_doc.project
-	if project and project not in {row.name for row in projects}:
-		project = None
-	if not project and len(projects) == 1:
-		project = projects[0].name
-	tasks = frappe.get_all(
-		"Task",
-		filters={"issue": issue_doc.name, "status": ("not in", ("Completed", "Cancelled"))},
-		fields=["name", "project"],
-		limit_page_length=2,
-	)
+	if not project and issue_doc.customer:
+		project = frappe.db.get_value("Customer", issue_doc.customer, "customer_project")
+	if not project:
+		frappe.throw(_("Link the issue to its customer project before booking time."))
+	project_doc = frappe.get_doc("Project", project)
+	if not frappe.has_permission("Project", "read", doc=project_doc):
+		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
+	validate_issue_booking(issue_doc.name, project)
+	try:
+		tasks = frappe.get_list(
+			"Task",
+			filters={"issue": issue_doc.name, "status": ("not in", ("Completed", "Cancelled"))},
+			fields=["name", "project"],
+			limit_page_length=2,
+		)
+	except frappe.PermissionError:
+		tasks = []
 	task = tasks[0].name if len(tasks) == 1 and tasks[0].project == project else None
-	selected_project = next((row for row in projects if row.name == project), None)
 	return {
 		"issue": issue_doc.name,
 		"employee": employee,
 		"date": str(getdate(date)),
 		"customer": issue_doc.customer,
-		"projects": projects,
 		"project": project,
+		"project_name": project_doc.project_name,
 		"task": task,
-		"billable": int(bool(selected_project and selected_project.billing_model == "Time and Material")),
-		"project_ambiguous": not project and len(projects) > 1,
+		"billable": int(_project_time_is_billable(project_doc)),
+		"time_billable": int(_project_time_is_billable(project_doc)),
+		"project_ambiguous": False,
+	}
+
+
+@frappe.whitelist()
+def get_project_time_context(project: str, date: str):
+	require_time_booking_identity()
+	employee = get_user_employee()
+	if not employee:
+		frappe.throw(_("Your user account is not linked to an Employee record."), frappe.PermissionError)
+	project_doc = frappe.get_doc("Project", project)
+	if not frappe.has_permission("Project", "read", doc=project_doc):
+		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
+	if project_doc.status in {"Completed", "Cancelled"} or project_doc.is_active == "No":
+		frappe.throw(_("Time can only be booked to an open project."))
+	return {
+		"employee": employee,
+		"date": str(getdate(date)),
+		"customer": project_doc.customer,
+		"project": project_doc.name,
+		"project_name": project_doc.project_name,
+		"billable": int(_project_time_is_billable(project_doc)),
+		"time_billable": int(_project_time_is_billable(project_doc)),
+	}
+
+
+@frappe.whitelist()
+def get_time_booking_context(
+	date: str, project: str | None = None, issue: str | None = None, task: str | None = None
+):
+	if task:
+		context = get_task_time_context(task, date)
+	elif issue:
+		context = get_issue_time_context(issue, date)
+	elif project:
+		context = get_project_time_context(project, date)
+	else:
+		frappe.throw(_("Select a project, issue or task before booking time."))
+
+	resolved_project = context["project"]
+	if project and project != resolved_project:
+		frappe.throw(_("The selected work item belongs to another project."))
+	project_doc = frappe.get_doc("Project", resolved_project)
+	issues = frappe.get_list(
+		"Issue",
+		filters={"project": resolved_project, "status": ("not in", ("Resolved", "Closed"))},
+		fields=["name", "subject"],
+		order_by="modified desc",
+		limit_page_length=100,
+	)
+	tasks = frappe.get_list(
+		"Task",
+		filters={"project": resolved_project, "status": ("not in", ("Completed", "Cancelled"))},
+		fields=["name", "subject", "issue"],
+		order_by="modified desc",
+		limit_page_length=100,
+	)
+	return {
+		**context,
+		"project": resolved_project,
+		"project_name": project_doc.project_name,
+		"issue": issue or context.get("issue"),
+		"task": task or context.get("task"),
+		"issues": issues,
+		"tasks": tasks,
 	}
 
 
@@ -132,9 +213,8 @@ def get_task_time_context(task: str, date: str):
 		"date": str(getdate(date)),
 		"customer": project_doc.customer,
 		"project": project_doc.name,
-		"billable": int(
-			project_doc.project_type != "Internal" and project_doc.billing_model == "Time and Material"
-		),
+		"billable": int(_project_time_is_billable(project_doc)),
+		"time_billable": int(_project_time_is_billable(project_doc)),
 	}
 
 
@@ -181,6 +261,44 @@ def _append_time_log(
 	)
 	doc.save()
 	return {"working_time": doc.name, "route": f"/app/working-time/{doc.name}"}
+
+
+@frappe.whitelist()
+def book_time(
+	project: str,
+	date: str,
+	duration_minutes: int,
+	task: str | None = None,
+	issue: str | None = None,
+	start_time: str | None = None,
+	customer_description: str | None = None,
+	internal_note: str | None = None,
+	billable: int | str = 0,
+):
+	context = get_time_booking_context(date=date, project=project, issue=issue, task=task)
+	resolved_issue = context.get("issue")
+	resolved_task = context.get("task")
+	if resolved_task:
+		task_doc = _task_with_read_access(resolved_task)
+		if task_doc.project != project:
+			frappe.throw(_("The selected task belongs to another project."))
+		if resolved_issue and task_doc.issue and task_doc.issue != resolved_issue:
+			frappe.throw(_("The selected task belongs to another issue."))
+		resolved_issue = resolved_issue or task_doc.issue
+	if resolved_issue:
+		validate_issue_booking(resolved_issue, project, resolved_task)
+	return _append_time_log(
+		employee=context["employee"],
+		date=date,
+		duration_minutes=duration_minutes,
+		project=project,
+		task=resolved_task,
+		issue=resolved_issue,
+		start_time=start_time,
+		customer_description=customer_description,
+		internal_note=internal_note,
+		billable=billable,
+	)
 
 
 @frappe.whitelist()
