@@ -6,24 +6,22 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "from_time",
-  "to_time",
-  "column_break_3",
   "duration",
-  "billable",
-  "section_break_5",
   "project",
   "task",
   "issue",
   "customer_description",
   "internal_note",
+  "billable",
   "note",
+  "is_break",
   "section_break_9",
-  "is_break"
+  "from_time",
+  "to_time"
  ],
  "fields": [
   {
-   "columns": 1,
+   "columns": 2,
    "fieldname": "duration",
    "fieldtype": "Duration",
    "hide_days": 1,
@@ -33,7 +31,7 @@
    "description": "Enter the duration directly for new entries."
   },
   {
-   "columns": 1,
+   "columns": 2,
    "fieldname": "project",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -44,19 +42,20 @@
    "columns": 1,
    "fieldname": "from_time",
    "fieldtype": "Time",
-   "in_list_view": 1,
+   "hidden": 1,
    "label": "From"
   },
   {
    "columns": 1,
    "fieldname": "to_time",
    "fieldtype": "Time",
-   "in_list_view": 1,
+   "hidden": 1,
    "label": "To"
   },
   {
    "fieldname": "issue",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Issue",
    "options": "Issue",
    "read_only": 1
@@ -68,16 +67,8 @@
    "default": "0",
    "fieldname": "is_break",
    "fieldtype": "Check",
-   "in_list_view": 1,
+   "hidden": 1,
    "label": "Break"
-  },
-  {
-   "fieldname": "column_break_3",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "section_break_5",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "section_break_9",
@@ -88,6 +79,7 @@
    "depends_on": "eval: doc.project",
    "fieldname": "billable",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Billable",
    "options": "0%\n100%"
   },
@@ -103,6 +95,7 @@
   {
    "fieldname": "task",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Task",
    "link_filters": "[[\"Task\",\"project\",\"=\",\"eval: doc.project\"],[\"Task\",\"status\",\"in\",[\"Open\",\"Pending Review\",\"Working\",\"Overdue\"]]]",
    "options": "Task"

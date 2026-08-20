@@ -1,36 +1,33 @@
 frappe.ui.form.on("Task", {
-	async refresh(frm) {
-		if (frm.is_new()) return;
-		if (frm.doc.project && !["Completed", "Cancelled"].includes(frm.doc.status)) {
-			frm.add_custom_button(__("Book time"), () => {
-				window.location.href = `/app/working-time-quick-entry?task=${encodeURIComponent(frm.doc.name)}`;
-			});
-		}
-		if (!frm.doc.issue) return;
-		const files = await frappe.xcall("working_time.work_cockpit.get_issue_attachments", {
-			task: frm.doc.name,
-		});
-		const field = "working_time_issue_attachments_html";
-		if (!files.length) {
-			frm.set_df_property(field, "options", `<p class="text-muted">${__("No private Issue attachments.")}</p>`);
-			frm.refresh_field(field);
-			return;
-		}
-		const list = $("<ul class='mb-0'></ul>");
-		for (const file of files) {
-			let url;
+	refresh(frm) {
+		if (frm.is_new() || !frm.doc.project || frm.doc.status === "Cancelled") return;
+		let opening = false;
+		const button = frm.add_custom_button(__("Book time"), async () => {
+			if (opening) return;
+			opening = true;
+			button.prop("disabled", true).attr("aria-busy", "true");
 			try {
-				url = new URL(file.file_url, window.location.origin);
-			} catch {
-				continue;
+				if (typeof window.working_time?.open_time_booking_dialog !== "function") {
+					throw new Error(__("The time booking dialog is not available."));
+				}
+				await window.working_time.open_time_booking_dialog({
+					project: frm.doc.project,
+					issue: frm.doc.issue || undefined,
+					task: frm.doc.name,
+					on_booked: () => frm.reload_doc(),
+				});
+			} catch (error) {
+				frappe.msgprint({
+					title: __("Book time"),
+					message: frappe.utils.escape_html(
+						String(error?.message || __("Time booking could not be opened."))
+					),
+					indicator: "red",
+				});
+			} finally {
+				opening = false;
+				button.prop("disabled", false).removeAttr("aria-busy");
 			}
-			if (!["http:", "https:"].includes(url.protocol)) continue;
-			const link = $("<a target='_blank' rel='noopener noreferrer'></a>")
-				.attr("href", url.href)
-				.text(file.file_name || file.name);
-			$("<li></li>").append(link).appendTo(list);
-		}
-		frm.set_df_property(field, "options", list.prop("outerHTML"));
-		frm.refresh_field(field);
+		});
 	},
 });

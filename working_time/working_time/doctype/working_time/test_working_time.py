@@ -10,6 +10,7 @@ from frappe import ValidationError, _dict
 from working_time.working_time.doctype.working_time.working_time import (
 	WorkingTime,
 	aggregate_time_logs,
+	apply_project_billing_policy,
 	calculate_hours,
 	get_billable_duration,
 	get_timesheet_description,
@@ -50,6 +51,30 @@ class TestWorkingTime(unittest.TestCase):
 		for billable in ("25%", "50%", "75%", "125%", "150%"):
 			with self.subTest(billable=billable), self.assertRaises(ValidationError):
 				calculate_hours(_dict(duration=7 * 60, billable=billable))
+
+	def test_simple_project_switch_controls_billable_time(self):
+		log = _dict(project="PROJ-0001", billable="100%")
+		with patch(
+			"working_time.working_time.doctype.working_time.working_time.frappe.db.get_value",
+			return_value=(None, 0),
+		):
+			apply_project_billing_policy(log)
+		self.assertEqual(log.billable, "0%")
+
+		with patch(
+			"working_time.working_time.doctype.working_time.working_time.frappe.db.get_value",
+			return_value=(None, 1),
+		):
+			apply_project_billing_policy(log)
+		self.assertEqual(log.billable, "0%")
+
+		log.billable = None
+		with patch(
+			"working_time.working_time.doctype.working_time.working_time.frappe.db.get_value",
+			return_value=(None, 1),
+		):
+			apply_project_billing_policy(log)
+		self.assertEqual(log.billable, "100%")
 
 	def test_rest_validation_uses_duration_first_day_boundaries(self):
 		document = _dict(

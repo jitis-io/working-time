@@ -1,9 +1,0 @@
-{
- "doctype": "Page",
- "module": "Working Time",
- "name": "working-time-quick-entry",
- "page_name": "working-time-quick-entry",
- "title": "Zeit buchen",
- "standard": "Yes",
- "roles": [{"role": "Employee"}, {"role": "Projects Manager"}, {"role": "System Manager"}]
-}

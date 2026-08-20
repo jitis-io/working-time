@@ -1,9 +1,9 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: JITIS Work 1.6.1\n"
+"Project-Id-Version: Working Time 1.7.0\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
-"POT-Creation-Date: 2026-08-17 00:00+0000\n"
-"PO-Revision-Date: 2026-08-17 00:00+0000\n"
+"POT-Creation-Date: 2026-08-20 00:00+0000\n"
+"PO-Revision-Date: 2026-08-20 00:00+0000\n"
 "Last-Translator: JITIS <info@jitis.io>\n"
 "Language-Team: English <info@jitis.io>\n"
 "Language: en\n"
@@ -18,3 +18,609 @@ msgstr "JITIS Work"
 
 msgid "Platform Operations Settings"
 msgstr "JITIS Work Settings"
+
+#: working_time/customer_projects.py:35
+msgid "You are not permitted to {0} {1} records."
+msgstr ""
+
+#: working_time/customer_projects.py:111
+msgid "Customer is required."
+msgstr ""
+
+#: working_time/customer_projects.py:130
+msgid "Project {0} is cancelled and cannot be used as the customer project."
+msgstr ""
+
+#: working_time/customer_projects.py:138
+msgid "Set a Default Company before creating customer projects."
+msgstr ""
+
+#: working_time/customer_projects.py:248 working_time/issues.py:58
+msgid "Issue and project must belong to the same customer."
+msgstr ""
+
+#: working_time/project_overview.py:58 working_time/project_overview.py:64
+msgid "Month must use the YYYY-MM format."
+msgstr ""
+
+#: working_time/project_overview.py:302
+msgid "Select a project."
+msgstr ""
+
+#: working_time/project_overview.py:306 working_time/issues.py:53
+#: working_time/issues.py:102 working_time/issues.py:132
+#: working_time/issues.py:196
+msgid "You are not permitted to read this project."
+msgstr ""
+
+#: working_time/issues.py:14 working_time/issues.py:30
+#: working_time/issues.py:88 working_time/issues.py:129
+msgid "Your user account is not linked to an Employee record."
+msgstr ""
+
+#: working_time/issues.py:22
+msgid "You are not permitted to read this task."
+msgstr ""
+
+#: working_time/issues.py:33
+msgid "Time cannot be booked to a cancelled task."
+msgstr ""
+
+#: working_time/issues.py:40
+msgid "You are not permitted to read this issue."
+msgstr ""
+
+#: working_time/issues.py:49
+msgid "A task cannot be booked without a project."
+msgstr ""
+
+#: working_time/issues.py:55
+msgid "The issue is linked to another project."
+msgstr ""
+
+#: working_time/issues.py:60
+msgid "Internal issues may only be booked to Internal projects."
+msgstr ""
+
+#: working_time/issues.py:64
+msgid "The selected task does not belong to the project."
+msgstr ""
+
+#: working_time/issues.py:66 working_time/issues.py:277
+msgid "The selected task belongs to another issue."
+msgstr ""
+
+#: working_time/issues.py:99
+msgid "Link the issue to its customer project before booking time."
+msgstr ""
+
+#: working_time/issues.py:134
+msgid "Time can only be booked to an open project."
+msgstr ""
+
+#: working_time/issues.py:158
+msgid "Select a project, issue or task before booking time."
+msgstr ""
+
+#: working_time/issues.py:162
+msgid "The selected work item belongs to another project."
+msgstr ""
+
+#: working_time/issues.py:193
+msgid "Link the task to a project before booking time."
+msgstr ""
+
+#: working_time/issues.py:227 working_time/public/js/time_booking.js:144
+msgid "Duration must be greater than zero."
+msgstr ""
+
+#: working_time/issues.py:235
+msgid "Invalid start time."
+msgstr ""
+
+#: working_time/issues.py:275
+msgid "The selected task belongs to another project."
+msgstr ""
+
+#: working_time/public/js/project.js:15
+msgid "Save the project to open its monthly account."
+msgstr ""
+
+#: working_time/public/js/project.js:86
+msgid "Loading monthly account…"
+msgstr ""
+
+#: working_time/public/js/project.js:109
+msgid "The monthly account could not be loaded."
+msgstr ""
+
+#: working_time/public/js/project.js:112
+msgid "Try again"
+msgstr ""
+
+#: working_time/public/js/project.js:128
+msgid "Monthly account"
+msgstr ""
+
+#: working_time/public/js/project.js:135
+msgid "{0} open issues · {1} open tasks"
+msgstr ""
+
+#: working_time/public/js/project.js:148
+msgid "Purchase invoices"
+msgstr ""
+
+#: working_time/public/js/project.js:160
+msgid "Sales invoices"
+msgstr ""
+
+#: working_time/public/js/project.js:174
+msgid "Month"
+msgstr ""
+
+#: working_time/public/js/project.js:184 working_time/public/js/issue.js:5
+#: working_time/public/js/task.js:5 working_time/public/js/time_booking.js:45
+msgid "Book time"
+msgstr ""
+
+#: working_time/public/js/project.js:186 working_time/public/js/issue.js:11
+#: working_time/public/js/task.js:11
+msgid "The time booking dialog is not available."
+msgstr ""
+
+#: working_time/public/js/project.js:193
+msgid "Daily close"
+msgstr ""
+
+#: working_time/public/js/project.js:196
+msgid "New issue"
+msgstr ""
+
+#: working_time/public/js/project.js:201
+msgid "New task"
+msgstr ""
+
+#: working_time/public/js/project.js:204
+msgid "Purchase invoice"
+msgstr ""
+
+#: working_time/public/js/project.js:209
+msgid "Prepare invoice draft"
+msgstr ""
+
+#: working_time/public/js/project.js:229
+msgid "Project account"
+msgstr ""
+
+#: working_time/public/js/project.js:231
+msgid "The action could not be completed."
+msgstr ""
+
+#: working_time/public/js/project.js:254
+msgid "No daily working time record is available."
+msgstr ""
+
+#: working_time/public/js/project.js:263
+msgid "No billing review was created."
+msgstr ""
+
+#: working_time/public/js/project.js:264
+msgid "Billing review created"
+msgstr ""
+
+#: working_time/public/js/project.js:274 working_time/public/js/project.js:325
+msgid "Hours"
+msgstr ""
+
+#: working_time/public/js/project.js:276
+msgid "{0} billable"
+msgstr ""
+
+#: working_time/public/js/project.js:279 working_time/public/js/project.js:326
+msgid "Unbilled"
+msgstr ""
+
+#: working_time/public/js/project.js:284
+msgid "Purchases"
+msgstr ""
+
+#: working_time/public/js/project.js:288
+msgid "Purchase cost"
+msgstr ""
+
+#: working_time/public/js/project.js:288 working_time/public/js/project.js:297
+msgid "No access"
+msgstr ""
+
+#: working_time/public/js/project.js:291
+msgid "Invoiced"
+msgstr ""
+
+#: working_time/public/js/project.js:296
+msgid "{0} in drafts"
+msgstr ""
+
+#: working_time/public/js/project.js:300
+msgid "Margin"
+msgstr ""
+
+#: working_time/public/js/project.js:305
+msgid "{0} time cost"
+msgstr ""
+
+#: working_time/public/js/project.js:318
+msgid "Time entries"
+msgstr ""
+
+#: working_time/public/js/project.js:321 working_time/public/js/project.js:368
+#: working_time/public/js/time_booking.js:76
+msgid "Date"
+msgstr ""
+
+#: working_time/public/js/project.js:322
+msgid "Employee"
+msgstr ""
+
+#: working_time/public/js/project.js:323
+msgid "Reference"
+msgstr ""
+
+#: working_time/public/js/project.js:324
+msgid "Description"
+msgstr ""
+
+#: working_time/public/js/project.js:369
+msgid "Document"
+msgstr ""
+
+#: working_time/public/js/project.js:370
+msgid "Party"
+msgstr ""
+
+#: working_time/public/js/project.js:371
+msgid "Status"
+msgstr ""
+
+#: working_time/public/js/project.js:372
+msgid "Amount"
+msgstr ""
+
+#: working_time/public/js/project.js:406
+msgid "No entries in this month."
+msgstr ""
+
+#: working_time/public/js/time_booking.js:46 working_time/public/js/issue.js:22
+#: working_time/public/js/task.js:23
+msgid "Time booking could not be opened."
+msgstr ""
+
+#: working_time/public/js/time_booking.js:67
+msgid "Project"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:85
+msgid "Issue"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:97
+msgid "Task"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:114
+msgid "Duration (minutes)"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:120
+msgid "Billable"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:127
+msgid "Customer Description"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:132
+msgid "Internal Note"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:167
+msgid "Time booked"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:173
+msgid "Time was booked. Refresh the view to see it."
+msgstr ""
+
+#: working_time/public/js/time_booking.js:181
+msgid "Time could not be booked."
+msgstr ""
+
+#: working_time/public/js/customer.js:5 working_time/public/js/customer.js:23
+msgid "Customer project"
+msgstr ""
+
+#: working_time/public/js/customer.js:14
+msgid "No customer project is available."
+msgstr ""
+
+#: working_time/public/js/customer.js:16
+msgid "Customer project created"
+msgstr ""
+
+#: working_time/public/js/customer.js:18
+msgid "Customer project reopened"
+msgstr ""
+
+#: working_time/public/js/customer.js:25
+msgid "The customer project could not be opened."
+msgstr ""
+
+#: working_time/public/js/purchase_invoice.js:31
+msgid "Purchase Invoice"
+msgstr ""
+
+#: working_time/public/js/purchase_invoice.js:33
+msgid "The project could not be applied."
+msgstr ""
+
+#: working_time/public/js/billing_review_list.js:4
+msgid "Create monthly review"
+msgstr ""
+
+#: working_time/public/js/billing_review_list.js:10
+msgid "Create billing review"
+msgstr ""
+
+#: working_time/public/js/billing_review_list.js:14
+msgid "Period start"
+msgstr ""
+
+#: working_time/public/js/billing_review_list.js:21
+msgid "Period end"
+msgstr ""
+
+#: working_time/public/js/billing_review_list.js:33
+msgid "Create preview"
+msgstr ""
+
+#: working_time/public/js/billing_review_list.js:39
+msgid "Collecting billable time…"
+msgstr ""
+
+#: working_time/public/js/project.js:132
+msgid "Time billing enabled"
+msgstr ""
+
+#: working_time/public/js/project.js:132
+msgid "Time billing disabled"
+msgstr ""
+
+#: working_time/public/js/project.js:138
+msgid "Time appears here after the daily close has been submitted."
+msgstr ""
+
+#: working_time/public/js/project.js:216
+msgid "Sales invoice"
+msgstr ""
+
+#: working_time/public/js/time_booking.js:125
+msgid "Enable time billing on the Project to bill these hours."
+msgstr ""
+
+#: working_time/public/js/time_booking.js:172
+msgid "Time saved in the daily close"
+msgstr ""
+
+#: working_time/customer_projects.py:158
+msgid "Project name {0} is already used by project {1} for another customer."
+msgstr ""
+
+#: working_time/public/js/project.js:229
+msgid "Create time invoice draft"
+msgstr ""
+
+#: working_time/public/js/project.js:282
+msgid "Create one draft Sales Invoice for the unbilled submitted time? Nothing will be submitted or sent."
+msgstr ""
+
+#: working_time/public/js/project.js:299
+msgid "No time invoice draft was created."
+msgstr ""
+
+#: working_time/public/js/project.js:300
+msgid "Time invoice draft created"
+msgstr ""
+
+#: working_time/platform_operations.py:495
+msgid "Set Default time billing item in Working Time Settings first."
+msgstr ""
+
+#: working_time/platform_operations.py:525
+msgid "Project time billing settings changed after the preview for {0}."
+msgstr ""
+
+#: working_time/platform_operations.py:538
+msgid "Billing Review rates must equal the Sales Order time item rate for {0}."
+msgstr ""
+
+#: working_time/platform_operations.py:557
+msgid "All customer projects in one invoice must use the same company."
+msgstr ""
+
+#: working_time/platform_operations.py:613
+msgid "Project is required for project time billing."
+msgstr ""
+
+#: working_time/platform_operations.py:622
+msgid "Project billing must create exactly one draft Sales Invoice; created {0}."
+msgstr ""
+
+#: working_time/hooks.py:217
+msgid "Bill Time"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_settings/working_time_settings.json:17
+msgid "Billing"
+msgstr ""
+
+#: working_time/hooks.py:224
+msgid "Billing Model"
+msgstr ""
+
+#: working_time/hooks.py:233
+msgid "Billing Rate per Hour"
+msgstr ""
+
+#: working_time/hooks.py:243
+msgid "Contract"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_settings/working_time_settings.json:14
+msgid "Create Daily Drafts"
+msgstr ""
+
+#: working_time/working_time/doctype/billing_review/billing_review.json:75
+msgid "Created invoice count"
+msgstr ""
+
+#: working_time/hooks.py:210
+msgid "Customer Account"
+msgstr ""
+
+#: working_time/hooks.py:259
+msgid "Customer Project"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_settings/working_time_settings.json:22
+msgid "Default time billing item"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:30
+msgid "Duration"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_settings/working_time_settings.json:19
+msgid "ERPNext Item used for hourly billing invoice drafts."
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:45
+msgid "Employee Name"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:75
+msgid "End"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:31
+msgid "Enter the duration directly for new entries."
+msgstr ""
+
+#: working_time/working_time/doctype/billing_review/billing_review.json:68
+msgid "Error"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:46
+msgid "From"
+msgstr ""
+
+#: working_time/working_time/doctype/billing_review/billing_review.json:54
+msgid "Items"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:91
+msgid "Legacy Note"
+msgstr ""
+
+#: working_time/hooks.py:250
+msgid "Monthly Overview"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:78
+msgid "Required Break"
+msgstr ""
+
+#: working_time/working_time/doctype/billing_review/billing_review.json:61
+msgid "Result"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_settings/working_time_settings.json:16
+msgid "Send Reminders"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:74
+msgid "Start"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:87
+msgid "Start with a \"+\" to include this note in billing output; other notes remain internal."
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_settings/working_time_settings.json:15
+msgid "Submission Deadline (Days)"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:107
+msgid "Summary"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:92
+msgid "Time Logs"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:53
+msgid "To"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:79
+msgid "Unallocated Time"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:72
+msgid "Workday"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:63
+msgid "Amended From"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:139
+msgid "Billable %"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:120
+msgid "Billable Time"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:77
+#: working_time/working_time/doctype/working_time/working_time.json:101
+#: working_time/working_time/doctype/working_time_log/working_time_log.json:71
+msgid "Break"
+msgstr ""
+
+#: working_time/hooks.py:270 working_time/hooks.py:288
+msgid "Operational State"
+msgstr ""
+
+#: working_time/hooks.py:279
+msgid "Planned Date"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:131
+msgid "Project %"
+msgstr ""
+
+#: working_time/working_time/doctype/working_time/working_time.json:112
+msgid "Project Time"
+msgstr ""
+
+#: working_time/hooks.py:299 working_time/hooks.py:334
+#: working_time/working_time/doctype/working_time/working_time.json:86
+msgid "Working Time"
+msgstr ""
+
+#: working_time/hooks.py:345
+msgid "Working Time Policy"
+msgstr ""
+
+#: working_time/platform_operations.py:562
+msgid "Set a Default Currency for company {0} before creating invoice drafts."
+msgstr ""

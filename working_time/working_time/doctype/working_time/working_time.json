@@ -19,16 +19,10 @@
   "unallocated_time",
   "time_logs",
   "section_break_7",
+  "working_time",
   "project_time",
   "billable_time",
-  "working_time",
   "column_break_covil",
-  "project_pct",
-  "billable_pct",
-  "break_time",
-  "stats_section",
-  "stats_html",
-  "section_break_cg6mr",
   "amended_from"
  ],
  "fields": [
@@ -103,12 +97,14 @@
    "fieldtype": "Duration",
    "hide_days": 1,
    "hide_seconds": 1,
+   "hidden": 1,
    "label": "Break",
    "read_only": 1
   },
   {
    "fieldname": "section_break_7",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Summary"
   },
   {
    "fieldname": "project_time",
@@ -131,6 +127,7 @@
   {
    "fieldname": "project_pct",
    "fieldtype": "Percent",
+   "hidden": 1,
    "label": "Project %",
    "precision": "0",
    "read_only": 1
@@ -138,22 +135,10 @@
   {
    "fieldname": "billable_pct",
    "fieldtype": "Percent",
+   "hidden": 1,
    "label": "Billable %",
    "precision": "0",
    "read_only": 1
-  },
-  {
-   "fieldname": "stats_html",
-   "fieldtype": "HTML",
-   "label": "Stats HTML"
-  },
-  {
-   "fieldname": "stats_section",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "section_break_cg6mr",
-   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,

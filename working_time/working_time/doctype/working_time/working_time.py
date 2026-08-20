@@ -7,9 +7,7 @@ import frappe
 from frappe import _
 from frappe.model.docstatus import DocStatus
 from frappe.model.document import Document
-from frappe.utils.data import add_to_date, flt, format_duration, get_time, getdate
-
-from working_time.working_time.number_card.number_cards import get_chart_data
+from frappe.utils.data import format_duration, get_time, getdate
 
 HALF_DAY = 3.25
 OVERTIME_FACTOR = 1.15
@@ -415,10 +413,10 @@ def apply_project_billing_policy(log) -> None:
 	if not log.project:
 		log.billable = "0%"
 		return
-	project_type, billing_model = frappe.db.get_value(
-		"Project", log.project, ["project_type", "billing_model"]
+	project_type, time_billable = frappe.db.get_value(
+		"Project", log.project, ["project_type", "time_billable"]
 	) or (None, None)
-	if project_type == "Internal" or billing_model != "Time and Material":
+	if project_type == "Internal" or not int(time_billable or 0):
 		log.billable = "0%"
 	elif not log.billable:
 		log.billable = "100%"
@@ -519,76 +517,3 @@ def aggregate_time_logs(time_logs) -> dict[tuple[str | None, str | None], dict]:
 				}
 
 	return aggregated_time_logs
-
-
-@frappe.whitelist()
-def get_working_time_stats(employee: str, date: str):
-	if not employee or not date:
-		return []
-
-	today = getdate(date)
-	yesterday = getdate(add_to_date(today, days=-1))
-	start_of_last_month = getdate(add_to_date(today.replace(day=1), months=-1))
-	start_of_this_month = today.replace(day=1)
-	end_of_last_month = getdate(add_to_date(start_of_this_month, days=-1))
-
-	working_time_avg_last_month = get_chart_data(
-		employee, start_of_last_month, end_of_last_month, "working_time"
-	)
-	break_time_avg_last_month = get_chart_data(employee, start_of_last_month, end_of_last_month, "break_time")
-	billing_time_avg_last_month = get_chart_data(
-		employee, start_of_last_month, end_of_last_month, "billable_time"
-	)
-	billing_time_ratio_last_month = (
-		billing_time_avg_last_month / working_time_avg_last_month if working_time_avg_last_month else 0
-	)
-
-	stats = [
-		{
-			"timespan": _("Last Month"),
-			"daily_working_time": {
-				"value": flt(working_time_avg_last_month, 2),
-			},
-			"billing_time_ratio": {
-				"value": flt(billing_time_ratio_last_month * 100, 2),
-			},
-			"daily_break_time": {
-				"value": flt(break_time_avg_last_month, 2),
-			},
-		}
-	]
-	if yesterday.month == today.month:
-		working_time_avg_this_month = get_chart_data(employee, start_of_this_month, yesterday, "working_time")
-		break_time_avg_this_month = get_chart_data(employee, start_of_this_month, yesterday, "break_time")
-		billing_time_avg_this_month = get_chart_data(
-			employee, start_of_this_month, yesterday, "billable_time"
-		)
-		billing_time_ratio_this_month = (
-			billing_time_avg_this_month / working_time_avg_this_month if working_time_avg_this_month else 0
-		)
-
-		stats.append(
-			{
-				"timespan": _("This Month"),
-				"daily_working_time": {
-					"value": flt(working_time_avg_this_month, 2),
-					"pct_change": get_pct_change(working_time_avg_this_month, working_time_avg_last_month),
-				},
-				"billing_time_ratio": {
-					"value": flt(billing_time_ratio_this_month * 100, 2),
-					"pct_change": get_pct_change(
-						billing_time_ratio_this_month, billing_time_ratio_last_month
-					),
-				},
-				"daily_break_time": {
-					"value": flt(break_time_avg_this_month, 2),
-					"pct_change": get_pct_change(break_time_avg_this_month, break_time_avg_last_month),
-				},
-			},
-		)
-
-	return stats
-
-
-def get_pct_change(new, old):
-	return flt(-100 * (1 - new / old), 2) if old else 0
