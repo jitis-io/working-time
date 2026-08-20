@@ -31,8 +31,9 @@
 		} catch (error) {
 			frappe.msgprint({
 				title: __(frm.doctype),
-				message: frappe.utils.escape_html(
-					String(error?.message || __("The project could not be applied."))
+				message: window.working_time.safe_error(
+					error,
+					__("The project could not be applied.")
 				),
 				indicator: "red",
 			});
