@@ -1,5 +1,13 @@
 # Migration and acceptance checklist
 
+## 1.7.1 customer-account layout correction
+
+This patch gives the Customer Account tab its own sections so no custom field can inherit a column from
+ERPNext's Costing tab. The monthly overview is full-width, duplicate context is removed, actions and KPIs
+are grouped responsively, and server errors are converted to safe plain text before display. Canonical
+customer-account Projects now show a concise translated message before Frappe's generic link error when
+someone tries to close, deactivate or delete them. There is no business-data migration in this patch.
+
 ## 1.7.0 project-centred workflow
 
 Deploy only through the immutable ERP platform release. The normal `bench --site <site> migrate` step
@@ -15,8 +23,8 @@ After migration:
 
 1. `Platform Operations`, `Time Tracking`, `work-cockpit` and `working-time-quick-entry` are absent.
 2. Every non-disabled Customer has `customer_project` set.
-   On the 2026-08-20 production preflight this means 18 processed, 15 created and 3 exact Projects reused
-   and reopened.
+   On the 2026-08-20 production migration this meant 18 processed, 12 created and 6 existing Projects
+   reused. Three case-only visible-name variants were corrected manually after the migration.
 3. Every linked customer Project belongs to the same Customer, is open, and has the customer number as
    its visible project name. It uses manual progress so completed Tasks do not close the account.
 4. Historical job Projects remain unchanged; no Projects are merged or deleted.

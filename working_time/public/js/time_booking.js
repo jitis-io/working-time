@@ -11,9 +11,17 @@
 		);
 	}
 
-	function safe_error(error, fallback) {
-		return frappe.utils.escape_html(String(error?.message || fallback));
+	function plain_text(value) {
+		const parsed = new DOMParser().parseFromString(String(value || ""), "text/html");
+		return (parsed.body.textContent || "").replace(/\s+/g, " ").trim();
 	}
+
+	function safe_error(error, fallback) {
+		return frappe.utils.escape_html(plain_text(error?.message || fallback));
+	}
+
+	namespace.plain_text = plain_text;
+	namespace.safe_error = safe_error;
 
 	function allowed_link_query(doctype, rows, filter) {
 		const names = (rows || [])
@@ -68,7 +76,7 @@
 					reqd: 1,
 					read_only: fixed_project && Boolean(context.project),
 					default: context.project || options.project,
-					description: frappe.utils.escape_html(String(context.project_name || "")),
+					description: frappe.utils.escape_html(plain_text(context.project_name)),
 				},
 				{
 					fieldname: "date",

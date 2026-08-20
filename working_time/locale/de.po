@@ -5,7 +5,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time 1.7.0\n"
+"Project-Id-Version: Working Time 1.7.1\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
 "POT-Creation-Date: 2026-08-20 00:00+0000\n"
 "PO-Revision-Date: 2026-08-20 00:00+0000\n"
@@ -1105,6 +1105,20 @@ msgstr "Nicht zugeordnete Zeit"
 #: working_time/working_time/doctype/working_time/working_time.json:72
 msgid "Workday"
 msgstr "Arbeitstag"
+
+#: working_time/hooks.py
+msgid "Time Billing"
+msgstr "Zeitabrechnung"
+
+#: working_time/customer_projects.py
+msgid "Project {0} is the permanent customer account for {1} and must remain open and active. If the link is wrong, correct the customer project on the Customer first."
+msgstr "Projekt {0} ist das dauerhafte Kundenkonto von {1} und muss offen und aktiv bleiben. Bei einer falschen Verknüpfung muss zuerst das Kundenprojekt im Kundenstamm korrigiert werden."
+
+msgid "Total Expense Claim (via Expense Claims)"
+msgstr "Auslagen (Auslagenabrechnungen)"
+
+msgid "Last Edited By You"
+msgstr "Zuletzt von Ihnen bearbeitet"
 
 #: working_time/platform_operations.py:562
 msgid "Set a Default Currency for company {0} before creating invoice drafts."

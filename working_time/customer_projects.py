@@ -304,6 +304,28 @@ def assign_customer_project_to_issue(doc: Any, method: str | None = None) -> Non
 		frappe.throw(_("Issue and project must belong to the same customer."))
 
 
+def protect_customer_account_project(doc: Any, method: str | None = None) -> None:
+	"""Keep the canonical customer account open and replace Frappe's raw link error."""
+
+	customer = _document_value(doc, "customer")
+	if not customer:
+		return
+	linked_project = frappe.db.get_value("Customer", customer, "customer_project")
+	if linked_project != _document_value(doc, "name"):
+		return
+	status = _document_value(doc, "status")
+	is_active = _document_value(doc, "is_active", "Yes")
+	if method != "on_trash" and status == "Open" and is_active == "Yes":
+		return
+	frappe.throw(
+		_(
+			"Project {0} is the permanent customer account for {1} and must remain open and active. "
+			"If the link is wrong, correct the customer project on the Customer first."
+		).format(_document_value(doc, "name"), customer),
+		frappe.ValidationError,
+	)
+
+
 def sync_project_time_billing(doc: Any, method: str | None = None) -> None:
 	"""Keep the hidden legacy model aligned with the simple visible time switch."""
 

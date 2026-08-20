@@ -19,8 +19,9 @@ frappe.ui.form.on("Task", {
 			} catch (error) {
 				frappe.msgprint({
 					title: __("Book time"),
-					message: frappe.utils.escape_html(
-						String(error?.message || __("Time booking could not be opened."))
+					message: window.working_time.safe_error(
+						error,
+						__("Time booking could not be opened.")
 					),
 					indicator: "red",
 				});

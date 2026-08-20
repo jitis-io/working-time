@@ -35,7 +35,27 @@ class TestInstall(TestCase):
 		make_custom_fields()
 		make_custom_fields()
 
-		self.assertTrue(frappe.get_meta("Project").has_field("customer_account_tab"))
-		self.assertTrue(frappe.get_meta("Project").has_field("customer_account_overview"))
-		self.assertTrue(frappe.get_meta("Project").has_field("time_billable"))
+		meta = frappe.get_meta("Project")
+		fieldnames = [field.fieldname for field in meta.fields]
+		expected_order = [
+			"customer_account_tab",
+			"customer_account_settings_section",
+			"time_billable",
+			"billing_model",
+			"billing_rate",
+			"customer_account_settings_column",
+			"contract",
+			"customer_account_overview_section",
+			"customer_account_overview",
+		]
+		self.assertEqual(
+			[fieldname for fieldname in fieldnames if fieldname in expected_order],
+			expected_order,
+		)
+		self.assertEqual(meta.get_field("customer_account_tab").fieldtype, "Tab Break")
+		self.assertEqual(meta.get_field("customer_account_settings_section").fieldtype, "Section Break")
+		self.assertEqual(meta.get_field("customer_account_settings_column").fieldtype, "Column Break")
+		self.assertEqual(meta.get_field("customer_account_overview_section").fieldtype, "Section Break")
+		self.assertTrue(meta.has_field("customer_account_overview"))
+		self.assertTrue(meta.has_field("time_billable"))
 		self.assertTrue(frappe.get_meta("Customer").has_field("customer_project"))

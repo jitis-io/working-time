@@ -21,6 +21,7 @@ from working_time.customer_projects import (
 	backfill_customer_projects,
 	backfill_issue_projects,
 	ensure_customer_project,
+	protect_customer_account_project,
 	sync_project_time_billing,
 )
 from working_time.hooks import doc_events
@@ -516,6 +517,64 @@ class TestCustomerProjects(unittest.TestCase):
 			self.assertRaises(FrappeValidationError),
 		):
 			assign_customer_project_to_issue(issue)
+
+	def test_customer_account_project_has_clean_close_and_delete_guard(self):
+		for method, status, is_active in (
+			("validate", "Completed", "Yes"),
+			("validate", "Open", "No"),
+			("on_trash", "Open", "Yes"),
+		):
+			with self.subTest(method=method, status=status, is_active=is_active):
+				project = FakeDocument(
+					name="PROJ-ACCOUNT",
+					customer="CUST-ACCOUNT",
+					status=status,
+					is_active=is_active,
+				)
+				with (
+					patch(
+						"working_time.customer_projects.frappe.db.get_value",
+						return_value=project.name,
+					),
+					self.assertRaisesRegex(
+						FrappeValidationError,
+						"permanent customer account.*must remain open and active",
+					),
+				):
+					protect_customer_account_project(project, method)
+
+	def test_open_customer_account_and_unlinked_project_remain_editable(self):
+		canonical = FakeDocument(
+			name="PROJ-ACCOUNT",
+			customer="CUST-ACCOUNT",
+			status="Open",
+			is_active="Yes",
+		)
+		other = FakeDocument(
+			name="PROJ-OTHER",
+			customer="CUST-ACCOUNT",
+			status="Completed",
+			is_active="No",
+		)
+		with patch(
+			"working_time.customer_projects.frappe.db.get_value",
+			return_value=canonical.name,
+		):
+			self.assertIsNone(protect_customer_account_project(canonical, "validate"))
+			self.assertIsNone(protect_customer_account_project(other, "validate"))
+
+	def test_project_hooks_protect_customer_account_before_other_validation(self):
+		self.assertEqual(
+			doc_events["Project"]["validate"],
+			[
+				"working_time.customer_projects.protect_customer_account_project",
+				"working_time.customer_projects.sync_project_time_billing",
+			],
+		)
+		self.assertEqual(
+			doc_events["Project"]["on_trash"],
+			"working_time.customer_projects.protect_customer_account_project",
+		)
 
 	def test_invoice_header_only_fills_empty_item_projects(self):
 		invoice = FakeDocument(

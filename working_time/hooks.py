@@ -111,7 +111,11 @@ doc_events = {
 		"validate": "working_time.customer_projects.assign_customer_project_to_issue",
 	},
 	"Project": {
-		"validate": "working_time.customer_projects.sync_project_time_billing",
+		"validate": [
+			"working_time.customer_projects.protect_customer_account_project",
+			"working_time.customer_projects.sync_project_time_billing",
+		],
+		"on_trash": "working_time.customer_projects.protect_customer_account_project",
 	},
 	"Purchase Invoice": {
 		"validate": "working_time.customer_projects.apply_invoice_project",
@@ -209,15 +213,21 @@ working_time_custom_fields = {
 			"fieldname": "customer_account_tab",
 			"label": "Customer Account",
 			"fieldtype": "Tab Break",
-			"insert_after": "per_gross_margin",
+			"insert_after": "costing_tab",
 			"depends_on": "eval:doc.customer",
+		},
+		{
+			"fieldname": "customer_account_settings_section",
+			"label": "Time Billing",
+			"fieldtype": "Section Break",
+			"insert_after": "customer_account_tab",
 		},
 		{
 			"fieldname": "time_billable",
 			"label": "Bill Time",
 			"fieldtype": "Check",
 			"default": "0",
-			"insert_after": "customer_account_tab",
+			"insert_after": "customer_account_settings_section",
 		},
 		{
 			"fieldname": "billing_model",
@@ -239,17 +249,27 @@ working_time_custom_fields = {
 			"translatable": 0,
 		},
 		{
+			"fieldname": "customer_account_settings_column",
+			"fieldtype": "Column Break",
+			"insert_after": "billing_rate",
+		},
+		{
 			"fieldname": "contract",
 			"label": "Contract",
 			"fieldtype": "Link",
 			"options": "Contract",
-			"insert_after": "billing_rate",
+			"insert_after": "customer_account_settings_column",
+		},
+		{
+			"fieldname": "customer_account_overview_section",
+			"fieldtype": "Section Break",
+			"insert_after": "contract",
 		},
 		{
 			"fieldname": "customer_account_overview",
 			"label": "Monthly Overview",
 			"fieldtype": "HTML",
-			"insert_after": "contract",
+			"insert_after": "customer_account_overview_section",
 			"depends_on": "eval:doc.customer",
 		},
 	],
