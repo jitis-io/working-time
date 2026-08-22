@@ -22,4 +22,5 @@ python -m unittest \
 	working_time.test_issues \
 	working_time.test_customer_project_patches \
 	working_time.test_customer_projects \
+	working_time.test_client_scripts \
 	working_time.test_project_overview

@@ -5,17 +5,9 @@
 		frappe.ui.form.on(doctype, {
 			onload(frm) {
 				apply_route_project(frm);
-				show_item_project(frm);
 			},
 			refresh(frm) {
 				apply_route_project(frm);
-				show_item_project(frm);
-			},
-			project(frm) {
-				show_item_project(frm);
-			},
-			items_on_form_rendered(frm) {
-				show_item_project(frm);
 			},
 		});
 	}
@@ -39,19 +31,6 @@
 			});
 		} finally {
 			frm.__working_time_route_project_pending = false;
-		}
-	}
-
-	function show_item_project(frm) {
-		const grid = frm.fields_dict.items?.grid;
-		if (!grid?.get_docfield("project")) return;
-		grid.update_docfield_property("project", "hidden", 0);
-		grid.update_docfield_property("project", "in_list_view", 1);
-		grid.update_docfield_property("project", "columns", 2);
-		if (typeof grid.set_column_disp_in_list_view === "function") {
-			grid.set_column_disp_in_list_view("project", true);
-		} else if (typeof grid.set_column_disp === "function") {
-			grid.set_column_disp("project", true);
 		}
 	}
 })();

@@ -246,11 +246,10 @@ def backfill_customer_projects() -> dict[str, int | bool]:
 
 
 def backfill_issue_projects() -> dict[str, int]:
-	"""Set the canonical customer project on unresolved, unmapped Issues."""
+	"""Set the canonical customer project on every unmapped customer Issue."""
 	issues = frappe.get_all(
 		"Issue",
 		filters={
-			"status": ("not in", ("Resolved", "Closed")),
 			"customer": ("is", "set"),
 			"project": ("is", "not set"),
 		},
@@ -267,6 +266,8 @@ def backfill_issue_projects() -> dict[str, int]:
 		)
 		if not project:
 			continue
+		if frappe.db.get_value("Project", project, "customer") != _document_value(issue, "customer"):
+			continue
 		frappe.db.set_value(
 			"Issue",
 			_document_value(issue, "name"),
@@ -278,11 +279,94 @@ def backfill_issue_projects() -> dict[str, int]:
 	return {"matched": len(issues), "updated": updated, "skipped": len(issues) - updated}
 
 
+def _issue_project_and_customer(issue: str) -> tuple[str | None, str | None]:
+	state = frappe.db.get_value("Issue", issue, ["project", "customer"], as_dict=True)
+	if not state:
+		return None, None
+
+	customer = _document_value(state, "customer")
+	project = _document_value(state, "project")
+	if not project and customer:
+		project = frappe.db.get_value("Customer", customer, "customer_project")
+	return project, customer
+
+
+def assign_issue_project_to_task(doc: Any, method: str | None = None) -> None:
+	"""Keep a Task linked to the same canonical project as its Issue."""
+
+	del method
+	issue = _document_value(doc, "issue")
+	if not issue:
+		return
+
+	expected_project, customer = _issue_project_and_customer(issue)
+	project = _document_value(doc, "project")
+	if expected_project:
+		if project and project != expected_project:
+			frappe.throw(_("Task and issue must belong to the same project."))
+		if not project:
+			project = expected_project
+			_set_document_value(doc, "project", project)
+
+	if project and customer:
+		project_customer = frappe.db.get_value("Project", project, "customer")
+		if project_customer != customer:
+			frappe.throw(_("Issue and project must belong to the same customer."))
+
+
+def backfill_task_projects() -> dict[str, int]:
+	"""Set the Issue project on open, non-template Tasks that have no project."""
+
+	tasks = frappe.get_all(
+		"Task",
+		filters={
+			"status": ("not in", ("Completed", "Cancelled")),
+			"is_template": 0,
+			"issue": ("is", "set"),
+			"project": ("is", "not set"),
+		},
+		fields=["name", "issue"],
+		order_by="name asc",
+		limit_page_length=0,
+	)
+	updated = 0
+	for task in tasks:
+		project, customer = _issue_project_and_customer(_document_value(task, "issue"))
+		if not project:
+			continue
+		if customer and frappe.db.get_value("Project", project, "customer") != customer:
+			continue
+		frappe.db.set_value(
+			"Task",
+			_document_value(task, "name"),
+			"project",
+			project,
+			update_modified=False,
+		)
+		updated += 1
+	return {"matched": len(tasks), "updated": updated, "skipped": len(tasks) - updated}
+
+
 def after_customer_insert(doc: Any, method: str | None = None) -> None:
 	del method
 	if _as_bool(_document_value(doc, "disabled")):
 		return
 	_ensure_customer_project(doc.name, ignore_permissions=True)
+
+
+def after_customer_update(doc: Any, method: str | None = None) -> None:
+	"""Provision the account immediately when an existing Customer is enabled."""
+
+	del method
+	if _as_bool(_document_value(doc, "disabled")):
+		return
+	get_doc_before_save = getattr(doc, "get_doc_before_save", None)
+	if callable(get_doc_before_save) and get_doc_before_save() is None:
+		# New Customers are handled exactly once by after_customer_insert.
+		return
+	has_value_changed = getattr(doc, "has_value_changed", None)
+	if callable(has_value_changed) and has_value_changed("disabled"):
+		_ensure_customer_project(doc.name, ignore_permissions=True)
 
 
 def assign_customer_project_to_issue(doc: Any, method: str | None = None) -> None:

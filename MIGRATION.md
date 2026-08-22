@@ -1,5 +1,15 @@
 # Migration and acceptance checklist
 
+## 1.7.2 customer-account stabilization
+
+- Open Tasks linked to an Issue inherit that Issue's Project when the assignment is customer-safe.
+- Existing open, non-template Issue Tasks without a Project are backfilled during migration.
+- Reactivated Customers immediately receive or reopen their permanent customer Project.
+- Purchase and Sales Invoice item forms use ERPNext's native grid lifecycle again; the Project is still
+  copied server-side from the invoice header into empty item rows.
+- Dead Teams alert runtime code and empty provisioning Python stubs are retired without deleting
+  historical Platform Alert records.
+
 ## 1.7.1 customer-account layout correction
 
 This patch gives the Customer Account tab its own sections so no custom field can inherit a column from

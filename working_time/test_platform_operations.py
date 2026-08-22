@@ -53,7 +53,6 @@ from working_time.platform_operations import (
 	_billing_status,
 	_round_billable_hours,
 	_sales_order_time_billing_row,
-	_teams_adaptive_card,
 	create_billing_invoice_drafts,
 	create_billing_review,
 	create_project_time_invoice_draft,
@@ -751,20 +750,6 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(review.status, "Invoiced")
 		self.assertEqual(item.status, "Invoiced")
 
-	def test_teams_webhook_is_long_text_not_password(self):
-		doctype_path = (
-			Path(__file__).parent
-			/ "working_time"
-			/ "doctype"
-			/ "platform_operations_settings"
-			/ "platform_operations_settings.json"
-		)
-		metadata = json.loads(doctype_path.read_text())
-		fields = {field["fieldname"]: field for field in metadata["fields"]}
-
-		self.assertEqual(fields["teams_webhook_url"]["fieldtype"], "Small Text")
-		self.assertNotIn("keycloak_client_secret", fields)
-
 	def test_billable_ui_only_offers_non_billable_or_fully_billable(self):
 		doctype_path = (
 			Path(__file__).parent / "working_time" / "doctype" / "working_time_log" / "working_time_log.json"
@@ -773,29 +758,3 @@ class TestPlatformOperations(unittest.TestCase):
 		fields = {field["fieldname"]: field for field in metadata["fields"] if "fieldname" in field}
 
 		self.assertEqual(fields["billable"]["options"].splitlines(), ["0%", "100%"])
-
-	def test_teams_alert_uses_workflow_adaptive_card_schema(self):
-		payload = _teams_adaptive_card(
-			"customer-provisioning-failed",
-			"Error",
-			"Synchronization failed.",
-			"CUST-0001",
-			"PROJ-0001",
-		)
-
-		self.assertEqual(payload["type"], "message")
-		self.assertEqual(len(payload["attachments"]), 1)
-		attachment = payload["attachments"][0]
-		self.assertEqual(attachment["contentType"], "application/vnd.microsoft.card.adaptive")
-		self.assertIsNone(attachment["contentUrl"])
-		self.assertEqual(attachment["content"]["type"], "AdaptiveCard")
-		self.assertEqual(attachment["content"]["version"], "1.2")
-		self.assertEqual(attachment["content"]["body"][0]["color"], "Attention")
-		self.assertEqual(
-			attachment["content"]["body"][2]["facts"],
-			[
-				{"title": "Source", "value": "customer-provisioning-failed"},
-				{"title": "Customer", "value": "CUST-0001"},
-				{"title": "Project", "value": "PROJ-0001"},
-			],
-		)

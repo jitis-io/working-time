@@ -91,11 +91,17 @@ def migrate_project_time_billing():
 def backfill_customer_projects():
 	if not frappe.is_setup_complete():
 		return
-	from working_time.customer_projects import backfill_customer_projects as backfill_customers
-	from working_time.customer_projects import backfill_issue_projects
+	from working_time.customer_projects import (
+		backfill_customer_projects as backfill_customers,
+	)
+	from working_time.customer_projects import (
+		backfill_issue_projects,
+		backfill_task_projects,
+	)
 
 	backfill_customers()
 	backfill_issue_projects()
+	backfill_task_projects()
 
 
 def make_custom_fields():

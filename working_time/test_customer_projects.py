@@ -16,10 +16,13 @@ from working_time.customer_projects import (
 	_ensure_customer_project,
 	_preflight_project_name_conflicts,
 	after_customer_insert,
+	after_customer_update,
 	apply_invoice_project,
 	assign_customer_project_to_issue,
+	assign_issue_project_to_task,
 	backfill_customer_projects,
 	backfill_issue_projects,
+	backfill_task_projects,
 	ensure_customer_project,
 	protect_customer_account_project,
 	sync_project_time_billing,
@@ -426,15 +429,18 @@ class TestCustomerProjects(unittest.TestCase):
 		load_exact.assert_not_called()
 		conflict.assert_not_called()
 
-	def test_issue_backfill_uses_only_customer_mapping_for_open_unmapped_issues(self):
+	def test_issue_backfill_uses_only_canonical_mapping_for_all_unmapped_issues(self):
 		issues = [
-			FakeDocument(name="ISS-0001", customer="CUST-1"),
+			FakeDocument(name="ISS-CLOSED", customer="CUST-1"),
 			FakeDocument(name="ISS-0002", customer="CUST-2"),
 		]
 
 		def get_value(doctype, name, fieldname):
-			self.assertEqual((doctype, fieldname), ("Customer", "customer_project"))
-			return "PROJ-1" if name == "CUST-1" else None
+			if (doctype, fieldname) == ("Customer", "customer_project"):
+				return "PROJ-1" if name == "CUST-1" else None
+			if (doctype, name, fieldname) == ("Project", "PROJ-1", "customer"):
+				return "CUST-1"
+			self.fail(f"Unexpected lookup: {(doctype, name, fieldname)}")
 
 		with (
 			patch("working_time.customer_projects.frappe.get_all", return_value=issues) as get_all,
@@ -448,7 +454,6 @@ class TestCustomerProjects(unittest.TestCase):
 		get_all.assert_called_once_with(
 			"Issue",
 			filters={
-				"status": ("not in", ("Resolved", "Closed")),
 				"customer": ("is", "set"),
 				"project": ("is", "not set"),
 			},
@@ -456,25 +461,47 @@ class TestCustomerProjects(unittest.TestCase):
 			order_by="name asc",
 			limit_page_length=0,
 		)
-		self.assertEqual(get_value_mock.call_count, 2)
+		self.assertEqual(get_value_mock.call_count, 3)
 		set_value.assert_called_once_with(
 			"Issue",
-			"ISS-0001",
+			"ISS-CLOSED",
 			"project",
 			"PROJ-1",
 			update_modified=False,
 		)
 		self.assertEqual(result, {"matched": 2, "updated": 1, "skipped": 1})
 
+	def test_issue_backfill_skips_mapping_to_another_customer_project(self):
+		issue = FakeDocument(name="ISS-CLOSED", customer="CUST-1")
+		with (
+			patch("working_time.customer_projects.frappe.get_all", return_value=[issue]),
+			patch(
+				"working_time.customer_projects.frappe.db.get_value",
+				side_effect=["PROJ-OTHER", "CUST-OTHER"],
+			),
+			patch("working_time.customer_projects.frappe.db.set_value") as set_value,
+		):
+			result = backfill_issue_projects()
+
+		set_value.assert_not_called()
+		self.assertEqual(result, {"matched": 1, "updated": 0, "skipped": 1})
+
 	def test_issue_backfill_is_idempotent_after_issue_has_been_mapped(self):
+		def get_value(doctype, name, fieldname):
+			if (doctype, name, fieldname) == ("Customer", "CUST-1", "customer_project"):
+				return "PROJ-1"
+			if (doctype, name, fieldname) == ("Project", "PROJ-1", "customer"):
+				return "CUST-1"
+			self.fail(f"Unexpected lookup: {(doctype, name, fieldname)}")
+
 		with (
 			patch(
 				"working_time.customer_projects.frappe.get_all",
-				side_effect=[[FakeDocument(name="ISS-0001", customer="CUST-1")], []],
+				side_effect=[[FakeDocument(name="ISS-CLOSED", customer="CUST-1")], []],
 			),
 			patch(
 				"working_time.customer_projects.frappe.db.get_value",
-				return_value="PROJ-1",
+				side_effect=get_value,
 			),
 			patch("working_time.customer_projects.frappe.db.set_value") as set_value,
 		):
@@ -492,6 +519,35 @@ class TestCustomerProjects(unittest.TestCase):
 		) as ensure:
 			self.assertIsNone(after_customer_insert(FakeDocument(name="CUST-OFF", disabled=1)))
 			self.assertIsNone(after_customer_insert(FakeDocument(name="CUST-ON", disabled=0)))
+
+		ensure.assert_called_once_with("CUST-ON", ignore_permissions=True)
+
+	def test_customer_reactivation_provisions_project_immediately(self):
+		reactivated = FakeDocument(
+			name="CUST-ON",
+			disabled=0,
+			get_doc_before_save=lambda: FakeDocument(disabled=1),
+			has_value_changed=lambda fieldname: fieldname == "disabled",
+		)
+		unchanged = FakeDocument(
+			name="CUST-STILL-ON",
+			disabled=0,
+			get_doc_before_save=lambda: FakeDocument(disabled=0),
+			has_value_changed=lambda fieldname: False,
+		)
+		new_customer = FakeDocument(
+			name="CUST-NEW",
+			disabled=0,
+			get_doc_before_save=lambda: None,
+			has_value_changed=lambda fieldname: True,
+		)
+		with patch(
+			"working_time.customer_projects._ensure_customer_project",
+			return_value={"project": "PROJ-1", "created": True, "reopened": False},
+		) as ensure:
+			self.assertIsNone(after_customer_update(reactivated))
+			self.assertIsNone(after_customer_update(unchanged))
+			self.assertIsNone(after_customer_update(new_customer))
 
 		ensure.assert_called_once_with("CUST-ON", ignore_permissions=True)
 
@@ -517,6 +573,99 @@ class TestCustomerProjects(unittest.TestCase):
 			self.assertRaises(FrappeValidationError),
 		):
 			assign_customer_project_to_issue(issue)
+
+	def test_task_inherits_the_linked_issue_project(self):
+		task = FakeDocument(issue="ISS-0001", project=None)
+		with (
+			patch(
+				"working_time.customer_projects._issue_project_and_customer",
+				return_value=("PROJ-0001", "CUST-0001"),
+			),
+			patch(
+				"working_time.customer_projects.frappe.db.get_value",
+				return_value="CUST-0001",
+			),
+		):
+			assign_issue_project_to_task(task)
+
+		self.assertEqual(task.project, "PROJ-0001")
+
+	def test_task_rejects_a_project_that_differs_from_its_issue(self):
+		task = FakeDocument(issue="ISS-0001", project="PROJ-OTHER")
+		with (
+			patch(
+				"working_time.customer_projects._issue_project_and_customer",
+				return_value=("PROJ-0001", "CUST-0001"),
+			),
+			self.assertRaisesRegex(
+				FrappeValidationError,
+				"Task and issue must belong to the same project",
+			),
+		):
+			assign_issue_project_to_task(task)
+
+	def test_task_rejects_a_project_for_another_issue_customer(self):
+		task = FakeDocument(issue="ISS-0001", project="PROJ-0001")
+		with (
+			patch(
+				"working_time.customer_projects._issue_project_and_customer",
+				return_value=("PROJ-0001", "CUST-0001"),
+			),
+			patch(
+				"working_time.customer_projects.frappe.db.get_value",
+				return_value="CUST-OTHER",
+			),
+			self.assertRaisesRegex(
+				FrappeValidationError,
+				"Issue and project must belong to the same customer",
+			),
+		):
+			assign_issue_project_to_task(task)
+
+	def test_task_backfill_updates_only_safe_open_issue_tasks(self):
+		tasks = [
+			FakeDocument(name="TASK-1", issue="ISS-1"),
+			FakeDocument(name="TASK-2", issue="ISS-2"),
+			FakeDocument(name="TASK-3", issue="ISS-3"),
+		]
+		with (
+			patch("working_time.customer_projects.frappe.get_all", return_value=tasks) as get_all,
+			patch(
+				"working_time.customer_projects._issue_project_and_customer",
+				side_effect=[
+					("PROJ-1", "CUST-1"),
+					(None, "CUST-2"),
+					("PROJ-3", "CUST-3"),
+				],
+			),
+			patch(
+				"working_time.customer_projects.frappe.db.get_value",
+				side_effect=["CUST-1", "CUST-OTHER"],
+			),
+			patch("working_time.customer_projects.frappe.db.set_value") as set_value,
+		):
+			result = backfill_task_projects()
+
+		get_all.assert_called_once_with(
+			"Task",
+			filters={
+				"status": ("not in", ("Completed", "Cancelled")),
+				"is_template": 0,
+				"issue": ("is", "set"),
+				"project": ("is", "not set"),
+			},
+			fields=["name", "issue"],
+			order_by="name asc",
+			limit_page_length=0,
+		)
+		set_value.assert_called_once_with(
+			"Task",
+			"TASK-1",
+			"project",
+			"PROJ-1",
+			update_modified=False,
+		)
+		self.assertEqual(result, {"matched": 3, "updated": 1, "skipped": 2})
 
 	def test_customer_account_project_has_clean_close_and_delete_guard(self):
 		for method, status, is_active in (
@@ -574,6 +723,14 @@ class TestCustomerProjects(unittest.TestCase):
 		self.assertEqual(
 			doc_events["Project"]["on_trash"],
 			"working_time.customer_projects.protect_customer_account_project",
+		)
+		self.assertEqual(
+			doc_events["Task"]["validate"],
+			"working_time.customer_projects.assign_issue_project_to_task",
+		)
+		self.assertEqual(
+			doc_events["Customer"]["on_update"],
+			"working_time.customer_projects.after_customer_update",
 		)
 
 	def test_invoice_header_only_fills_empty_item_projects(self):
