@@ -19,3 +19,12 @@ docker compose -f ci/compose.yaml down --volumes --remove-orphans
 The integration check creates a disposable Frappe v16 bench, installs ERPNext
 and this app, migrates all DocTypes and custom fields, builds assets and runs
 the app tests.
+
+## Code Review Rules
+
+- Treat automatic invoice submission, customer-data deletion, or a
+  cross-customer project assignment as P0.
+- Treat any path where Issue, Task, time, purchase cost, or billing data can
+  bypass the canonical customer project as P1; require a regression test.
+- Require the disposable integration gate for hooks, DocTypes, custom fields,
+  migrations, and provisioning behavior.
