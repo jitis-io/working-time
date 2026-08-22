@@ -59,6 +59,19 @@ drill-down lists.
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
 
+## Upgrade to 1.7.2
+
+Version 1.7.2 stabilizes the customer-account flow without adding another work surface:
+
+- an open Task linked to an Issue inherits the Issue's customer Project, while conflicting customer or
+  Project combinations are rejected;
+- the migration fills that Project only on safe open, non-template Tasks that still have no Project;
+- reactivating an existing Customer immediately restores its permanent customer Project;
+- invoice item forms keep ERPNext's native grid lifecycle, preventing the white frozen detail view and
+  restoring the standard keyboard order;
+- unused Teams alert runtime code and the final empty provisioning class stubs are removed, while
+  historical Platform Alert records remain untouched.
+
 ## Upgrade to 1.7.0
 
 Version 1.7.0 removes the parallel JITIS Work / My Work user interface and makes Project the visible

@@ -28,6 +28,23 @@ def _bootstrap_custom_field_stub() -> None:
 
 _bootstrap_custom_field_stub()
 
+
+def _bootstrap_document_stub() -> None:
+	document_module = "frappe.model.document"
+	if getattr(frappe, "__file__", None) or document_module in sys.modules:
+		return
+	for module_name in ("frappe.model",):
+		module = sys.modules.setdefault(module_name, types.ModuleType(module_name))
+		module.__path__ = []
+	document = types.ModuleType(document_module)
+	document.Document = type("Document", (), {})
+	sys.modules[document.__name__] = document
+
+
+_bootstrap_document_stub()
+
+from frappe.model.document import Document
+
 from working_time.install import OBSOLETE_CUSTOM_FIELDS
 from working_time.patches.correct_customer_project_name import (
 	CORRECT_PROJECT_NAME,
@@ -45,6 +62,12 @@ from working_time.patches.retire_sales_order_provisioning import (
 )
 from working_time.patches.retire_sales_order_provisioning import (
 	execute as retire_sales_order_provisioning,
+)
+from working_time.working_time.doctype.customer_project_provisioning.customer_project_provisioning import (
+	CustomerProjectProvisioning,
+)
+from working_time.working_time.doctype.customer_project_provisioning_step.customer_project_provisioning_step import (
+	CustomerProjectProvisioningStep,
 )
 
 
@@ -159,6 +182,8 @@ class TestCustomerProjectPatches(unittest.TestCase):
 		delete_doc.assert_not_called()
 		clear_cache.assert_not_called()
 		self.assertNotIn("Sales Order", OBSOLETE_CUSTOM_FIELDS)
+		self.assertTrue(issubclass(CustomerProjectProvisioning, Document))
+		self.assertTrue(issubclass(CustomerProjectProvisioningStep, Document))
 
 	def test_empty_sales_order_provisioning_metadata_is_retired(self):
 		def exists(doctype, name):

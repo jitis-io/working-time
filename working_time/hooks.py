@@ -106,6 +106,7 @@ has_permission = {
 doc_events = {
 	"Customer": {
 		"after_insert": "working_time.customer_projects.after_customer_insert",
+		"on_update": "working_time.customer_projects.after_customer_update",
 	},
 	"Issue": {
 		"validate": "working_time.customer_projects.assign_customer_project_to_issue",
@@ -122,6 +123,9 @@ doc_events = {
 	},
 	"Sales Invoice": {
 		"validate": "working_time.customer_projects.apply_invoice_project",
+	},
+	"Task": {
+		"validate": "working_time.customer_projects.assign_issue_project_to_task",
 	},
 }
 
