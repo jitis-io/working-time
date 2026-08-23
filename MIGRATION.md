@@ -1,5 +1,14 @@
 # Migration and acceptance checklist
 
+## 1.7.3 billing-review consistency
+
+- Run the normal site migration to reconcile existing Billing Reviews with their linked Sales Invoices.
+- Create two previews for the same eligible Timesheet Detail and confirm that only the first can create a
+  draft; the second must report the existing claim.
+- Confirm the generated draft contains the exact native Sales Invoice Timesheet rows from the preview.
+- Submit the draft and verify the Billing Review and its linked rows become `Invoiced` automatically.
+- Cancel a linked invoice and verify the Billing Review becomes `Failed` while the source remains claimed.
+
 ## 1.7.2 customer-account stabilization
 
 - Open Tasks linked to an Issue inherit that Issue's Project when the assignment is customer-safe.

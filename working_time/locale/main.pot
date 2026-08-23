@@ -5,7 +5,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time 1.7.2\n"
+"Project-Id-Version: Working Time 1.7.3\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
 "POT-Creation-Date: 2026-08-21 00:00+0000\n"
 "PO-Revision-Date: 2026-08-21 00:00+0000\n"

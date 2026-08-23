@@ -63,6 +63,9 @@ from working_time.patches.retire_sales_order_provisioning import (
 from working_time.patches.retire_sales_order_provisioning import (
 	execute as retire_sales_order_provisioning,
 )
+from working_time.patches.synchronize_billing_review_statuses import (
+	execute as synchronize_billing_review_statuses,
+)
 from working_time.working_time.doctype.customer_project_provisioning.customer_project_provisioning import (
 	CustomerProjectProvisioning,
 )
@@ -76,6 +79,36 @@ class FakeDocument(types.SimpleNamespace):
 
 
 class TestCustomerProjectPatches(unittest.TestCase):
+	def test_billing_review_status_patch_is_scoped_and_idempotent(self):
+		linked = FakeDocument(sales_invoice="SINV-0001")
+		review = FakeDocument(name="BR-0001", items=[linked])
+		with (
+			patch(
+				"working_time.patches.synchronize_billing_review_statuses.frappe.db.exists",
+				return_value=True,
+			),
+			patch(
+				"working_time.patches.synchronize_billing_review_statuses.frappe.get_all",
+				return_value=["BR-0001"],
+			) as get_all,
+			patch(
+				"working_time.patches.synchronize_billing_review_statuses.frappe.get_doc",
+				return_value=review,
+			),
+			patch(
+				"working_time.patches.synchronize_billing_review_statuses._synchronize_billing_review_status"
+			) as synchronize,
+		):
+			synchronize_billing_review_statuses()
+			synchronize_billing_review_statuses()
+
+		get_all.assert_called_with(
+			"Billing Review",
+			pluck="name",
+		)
+		self.assertEqual(synchronize.call_count, 2)
+		synchronize.assert_called_with(review)
+
 	def test_exact_live_project_name_correction_is_idempotent(self):
 		states = iter(
 			[

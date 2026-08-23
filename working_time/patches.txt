@@ -11,3 +11,4 @@ execute:from working_time.install import make_custom_fields; make_custom_fields(
 working_time.patches.reclassify_billing_invoice_drafts # 2026-08-01
 working_time.patches.v1_3_migrate # 2026-08-02
 working_time.patches.v1_4_issue_support # 2026-08-11
+working_time.patches.synchronize_billing_review_statuses # 2026-08-22
