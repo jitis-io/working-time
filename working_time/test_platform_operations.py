@@ -51,12 +51,17 @@ FrappeValidationError = getattr(frappe, "ValidationError", RuntimeError)
 from working_time.platform_operations import (
 	_aggregate_billing_sources,
 	_billing_status,
+	_lock_billing_sources,
+	_review_source_items,
 	_round_billable_hours,
 	_sales_order_time_billing_row,
+	_synchronize_billing_review_status,
 	create_billing_invoice_drafts,
 	create_billing_review,
 	create_project_time_invoice_draft,
 	finalize_billing_review,
+	synchronize_billing_reviews_for_invoice,
+	validate_billing_review_invoice_sources,
 )
 
 
@@ -80,6 +85,25 @@ class FakeDocument(types.SimpleNamespace):
 			setattr(self, fieldname, rows)
 		rows.append(row)
 		return row
+
+
+def _locked_source(name="ROW-0001", *, project="PROJ-0001", billing_hours=0.2, sales_invoice=None):
+	return FakeDocument(
+		name=name,
+		parent="TS-0001",
+		parenttype="Timesheet",
+		docstatus=1,
+		project=project,
+		project_name=project,
+		is_billable=1,
+		billing_hours=billing_hours,
+		sales_invoice=sales_invoice,
+		from_time="2026-08-01 09:00:00",
+		to_time="2026-08-01 09:12:00",
+		activity_type="Support",
+		customer_description="Customer-visible work",
+		description="Internal work",
+	)
 
 
 class TestPlatformOperations(unittest.TestCase):
@@ -172,6 +196,73 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(status, "Already Drafted")
 		self.assertEqual(context, {})
 		get_doc.assert_not_called()
+
+	def test_native_sales_invoice_reference_fails_closed_before_project_lookup(self):
+		for docstatus, expected_status in (
+			(0, "Already Drafted"),
+			(1, "Already Invoiced"),
+			(2, "Already Invoiced"),
+			(None, "Already Invoiced"),
+		):
+			with self.subTest(docstatus=docstatus):
+				detail = FakeDocument(
+					name="ROW-0001",
+					project="PROJ-0001",
+					sales_invoice="SINV-NATIVE",
+				)
+				with (
+					patch(
+						"working_time.platform_operations.frappe.db.get_value",
+						return_value=docstatus,
+					) as get_value,
+					patch("working_time.platform_operations.frappe.get_doc") as get_doc,
+				):
+					status, context = _billing_status(detail, {})
+
+				self.assertEqual(status, expected_status)
+				self.assertEqual(context, {})
+				get_value.assert_called_once_with("Sales Invoice", "SINV-NATIVE", "docstatus")
+				get_doc.assert_not_called()
+
+	def test_source_lock_revalidates_exact_rows_in_deterministic_order(self):
+		item = FakeDocument(
+			project="PROJ-0001",
+			source_count=2,
+			raw_billable_hours=0.4,
+			source_details_json=('[{"timesheet_detail":"ROW-0002"},{"timesheet_detail":"ROW-0001"}]'),
+			timesheet_detail=None,
+		)
+		source_items = _review_source_items([item])
+		rows = [
+			_locked_source("ROW-0001", billing_hours=0.2),
+			_locked_source("ROW-0002", billing_hours=0.2),
+		]
+		with patch("working_time.platform_operations.frappe.db.sql", return_value=rows) as sql:
+			locked = _lock_billing_sources(source_items)
+
+		self.assertEqual(sorted(locked), ["ROW-0001", "ROW-0002"])
+		query, params = sql.call_args.args
+		self.assertIn("order by name", query.lower())
+		self.assertIn("for update", query.lower())
+		self.assertEqual(params, ("ROW-0001", "ROW-0002"))
+		self.assertEqual(sql.call_args.kwargs, {"as_dict": True})
+
+	def test_source_lock_rejects_native_invoice_reference(self):
+		item = FakeDocument(
+			project="PROJ-0001",
+			source_count=1,
+			raw_billable_hours=0.2,
+			timesheet_detail="ROW-0001",
+			source_details_json="",
+		)
+		with (
+			patch(
+				"working_time.platform_operations.frappe.db.sql",
+				return_value=[_locked_source(sales_invoice="SINV-NATIVE")],
+			),
+			self.assertRaisesRegex(FrappeValidationError, "native Sales Invoice references"),
+		):
+			_lock_billing_sources(_review_source_items([item]))
 
 	def test_billing_status_uses_time_billable_instead_of_legacy_billing_model(self):
 		detail = FakeDocument(name="ROW-0001", project="PROJ-0001")
@@ -341,6 +432,11 @@ class TestPlatformOperations(unittest.TestCase):
 				"working_time.platform_operations._settings",
 				return_value=FakeDocument(default_time_billing_item="TIME"),
 			),
+			patch(
+				"working_time.platform_operations._lock_billing_sources",
+				return_value={"ROW-0001": _locked_source()},
+			),
+			patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
 			patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
 			patch("working_time.platform_operations.frappe.get_all", return_value=[]),
 			patch(
@@ -370,6 +466,8 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(invoice_item["project"], "PROJ-0001")
 		self.assertNotIn("sales_order", invoice_item)
 		self.assertNotIn("so_detail", invoice_item)
+		self.assertEqual(invoice.values["timesheets"][0]["timesheet_detail"], "ROW-0001")
+		self.assertEqual(invoice.values["timesheets"][0]["billing_hours"], 0.2)
 		self.assertTrue(invoice.inserted)
 		self.assertEqual(item.status, "Draft Created")
 		self.assertEqual(item.sales_invoice, "SINV-0001")
@@ -416,6 +514,11 @@ class TestPlatformOperations(unittest.TestCase):
 				"working_time.platform_operations._settings",
 				return_value=FakeDocument(default_time_billing_item="TIME"),
 			),
+			patch(
+				"working_time.platform_operations._lock_billing_sources",
+				return_value={"ROW-0001": _locked_source()},
+			),
+			patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
 			patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
 			patch("working_time.platform_operations.frappe.get_all", return_value=[]),
 			patch("working_time.platform_operations.frappe.db.get_value", side_effect=get_value),
@@ -456,6 +559,54 @@ class TestPlatformOperations(unittest.TestCase):
 				"created": False,
 			},
 		)
+
+	def test_parallel_review_loser_observes_claim_after_source_lock(self):
+		item = FakeDocument(
+			status="Eligible",
+			customer="CUST-0001",
+			project="PROJ-0001",
+			hours=0.25,
+			rate=120,
+			timesheet_detail="ROW-0001",
+			source_count=1,
+			source_details_json='[{"timesheet_detail":"ROW-0001"}]',
+			sales_invoice=None,
+		)
+		review = FakeDocument(name="BR-LOSER", status="Preview", items=[item])
+		events = []
+
+		def lock_sources(source_items):
+			events.append(("lock", sorted(source_items)))
+			return {"ROW-0001": _locked_source()}
+
+		def current_claims(exclude_review=None, *, for_update=False):
+			events.append(("claims", exclude_review, for_update))
+			return {"ROW-0001": "Draft Created"}
+
+		with (
+			patch(
+				"working_time.platform_operations._settings",
+				return_value=FakeDocument(default_time_billing_item="TIME"),
+			),
+			patch("working_time.platform_operations._lock_billing_sources", side_effect=lock_sources),
+			patch(
+				"working_time.platform_operations._claimed_billing_sources",
+				side_effect=current_claims,
+			),
+			patch("working_time.platform_operations.frappe.db.sql"),
+			patch("working_time.platform_operations.frappe.get_doc", return_value=review) as get_doc,
+			self.assertRaisesRegex(FrappeValidationError, "assigned to another draft or invoice"),
+		):
+			create_billing_invoice_drafts("BR-LOSER")
+
+		self.assertEqual(
+			events,
+			[("lock", ["ROW-0001"]), ("claims", "BR-LOSER", True)],
+		)
+		get_doc.assert_called_once_with("Billing Review", "BR-LOSER")
+		self.assertEqual(review.status, "Preview")
+		self.assertEqual(item.status, "Eligible")
+		self.assertIsNone(item.sales_invoice)
 
 	def test_invoice_creation_marks_review_as_draft_created(self):
 		item = FakeDocument(
@@ -514,6 +665,11 @@ class TestPlatformOperations(unittest.TestCase):
 				"working_time.platform_operations._settings",
 				return_value=FakeDocument(default_time_billing_item="TIME"),
 			),
+			patch(
+				"working_time.platform_operations._lock_billing_sources",
+				return_value={"ROW-0001": _locked_source()},
+			),
+			patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
 			patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
 			patch("working_time.platform_operations.frappe.get_all", return_value=[]),
 			patch(
@@ -531,6 +687,7 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(invoice.values["items"][0]["qty"], 0.25)
 		self.assertEqual(invoice.values["items"][0]["sales_order"], "SO-0001")
 		self.assertEqual(invoice.values["items"][0]["so_detail"], "SOI-0001")
+		self.assertEqual(invoice.values["timesheets"][0]["timesheet_detail"], "ROW-0001")
 
 	def test_invoice_creation_rejects_rate_drift_before_building_invoice(self):
 		item = FakeDocument(
@@ -586,6 +743,11 @@ class TestPlatformOperations(unittest.TestCase):
 				"working_time.platform_operations._settings",
 				return_value=FakeDocument(default_time_billing_item="TIME"),
 			),
+			patch(
+				"working_time.platform_operations._lock_billing_sources",
+				return_value={"ROW-0001": _locked_source()},
+			),
+			patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
 			patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
 			patch("working_time.platform_operations.frappe.get_all", return_value=[]),
 			patch(
@@ -650,6 +812,14 @@ class TestPlatformOperations(unittest.TestCase):
 					patch(
 						"working_time.platform_operations._settings",
 						return_value=FakeDocument(default_time_billing_item="TIME"),
+					),
+					patch(
+						"working_time.platform_operations._lock_billing_sources",
+						return_value={"ROW-0001": _locked_source()},
+					),
+					patch(
+						"working_time.platform_operations._claimed_billing_sources",
+						return_value={},
 					),
 					patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
 					patch("working_time.platform_operations.frappe.get_all", return_value=[]),
@@ -724,11 +894,170 @@ class TestPlatformOperations(unittest.TestCase):
 				rollback.assert_called_once_with(save_point="project_time_invoice_draft")
 				commit.assert_not_called()
 
+	def test_submitted_invoice_synchronizes_review_once_and_stays_idempotent(self):
+		item = FakeDocument(status="Draft Created", sales_invoice="SINV-0001")
+		review = FakeDocument(
+			name="BR-0001",
+			status="Draft Created",
+			items=[item],
+			result_json='{"sales_invoices":["SINV-0001"],"status":"Draft Created"}',
+			error="",
+			created_invoice_count=1,
+		)
+		with (
+			patch(
+				"working_time.platform_operations.frappe.get_all",
+				return_value=[FakeDocument(name="SINV-0001", docstatus=1)],
+			),
+			patch.object(review, "save", wraps=review.save) as save,
+		):
+			first = _synchronize_billing_review_status(review)
+			second = _synchronize_billing_review_status(review)
+
+		self.assertEqual(first["status"], "Invoiced")
+		self.assertEqual(second, first)
+		self.assertEqual(review.status, "Invoiced")
+		self.assertEqual(item.status, "Invoiced")
+		self.assertEqual(save.call_count, 1)
+		self.assertIn("finalized_at", json.loads(review.result_json))
+
+	def test_cancelled_or_missing_invoice_marks_review_failed_but_keeps_source_claimed(self):
+		for invoice_rows in (
+			[FakeDocument(name="SINV-0001", docstatus=2)],
+			[],
+		):
+			with self.subTest(invoice_rows=invoice_rows):
+				item = FakeDocument(status="Draft Created", sales_invoice="SINV-0001")
+				review = FakeDocument(
+					name="BR-0001",
+					status="Draft Created",
+					items=[item],
+					result_json="{}",
+					error="",
+					created_invoice_count=1,
+				)
+				with patch(
+					"working_time.platform_operations.frappe.get_all",
+					return_value=invoice_rows,
+				):
+					result = _synchronize_billing_review_status(review)
+
+				self.assertEqual(result["status"], "Failed")
+				self.assertEqual(review.status, "Failed")
+				self.assertEqual(item.status, "Already Invoiced")
+				self.assertIn("SINV-0001", review.error)
+
+	def test_sales_invoice_event_locks_and_synchronizes_linked_reviews(self):
+		review = FakeDocument(name="BR-0001")
+		with (
+			patch(
+				"working_time.platform_operations.frappe.get_all",
+				return_value=["BR-0001", "BR-0001"],
+			) as get_all,
+			patch("working_time.platform_operations.frappe.db.sql") as sql,
+			patch("working_time.platform_operations.frappe.get_doc", return_value=review),
+			patch("working_time.platform_operations._synchronize_billing_review_status") as sync,
+		):
+			synchronize_billing_reviews_for_invoice(FakeDocument(name="SINV-0001"))
+
+		get_all.assert_called_once_with(
+			"Billing Review Item",
+			filters={"sales_invoice": "SINV-0001"},
+			pluck="parent",
+		)
+		self.assertEqual(
+			sql.call_args.args,
+			("select name from `tabBilling Review` where name=%s for update", ("BR-0001",)),
+		)
+		sync.assert_called_once_with(review)
+
+	def test_sales_invoice_hooks_keep_billing_review_status_current(self):
+		from working_time.hooks import doc_events
+
+		self.assertEqual(
+			doc_events["Sales Invoice"]["before_submit"],
+			"working_time.platform_operations.validate_billing_review_invoice_sources",
+		)
+		self.assertEqual(
+			doc_events["Sales Invoice"]["on_submit"],
+			"working_time.platform_operations.synchronize_billing_reviews_for_invoice",
+		)
+		self.assertEqual(
+			doc_events["Sales Invoice"]["on_cancel"],
+			"working_time.platform_operations.synchronize_billing_reviews_for_invoice",
+		)
+
+	def test_linked_invoice_submit_requires_exact_native_timesheet_sources(self):
+		item = FakeDocument(
+			project="PROJ-0001",
+			timesheet_detail="ROW-0001",
+			source_count=1,
+			source_details_json='[{"timesheet_detail":"ROW-0001"}]',
+			raw_billable_hours=0.2,
+		)
+		invoice = FakeDocument(
+			name="SINV-0001",
+			timesheets=[FakeDocument(time_sheet="TS-0001", timesheet_detail="ROW-0001")],
+		)
+		locked = {"ROW-0001": _locked_source()}
+		with (
+			patch("working_time.platform_operations.frappe.get_all", return_value=[item]) as get_all,
+			patch(
+				"working_time.platform_operations._lock_billing_sources",
+				return_value=locked,
+			) as lock_sources,
+		):
+			validate_billing_review_invoice_sources(invoice)
+
+		get_all.assert_called_once_with(
+			"Billing Review Item",
+			filters={"sales_invoice": "SINV-0001"},
+			fields=[
+				"timesheet_detail",
+				"source_details_json",
+				"source_count",
+				"project",
+				"raw_billable_hours",
+			],
+		)
+		lock_sources.assert_called_once()
+
+	def test_linked_invoice_submit_rejects_removed_or_duplicate_timesheet_sources(self):
+		item = FakeDocument(
+			project="PROJ-0001",
+			timesheet_detail="ROW-0001",
+			source_count=1,
+			source_details_json="",
+			raw_billable_hours=0.2,
+		)
+		locked = {"ROW-0001": _locked_source()}
+		for timesheets in (
+			[],
+			[
+				FakeDocument(time_sheet="TS-0001", timesheet_detail="ROW-0001"),
+				FakeDocument(time_sheet="TS-0001", timesheet_detail="ROW-0001"),
+			],
+		):
+			with (
+				self.subTest(timesheets=timesheets),
+				patch("working_time.platform_operations.frappe.get_all", return_value=[item]),
+				patch(
+					"working_time.platform_operations._lock_billing_sources",
+					return_value=locked,
+				),
+				self.assertRaisesRegex(FrappeValidationError, "no longer match"),
+			):
+				validate_billing_review_invoice_sources(FakeDocument(name="SINV-0001", timesheets=timesheets))
+
 	def test_billing_review_finalization_requires_submitted_invoices(self):
 		item = FakeDocument(status="Draft Created", sales_invoice="SINV-0001")
 		review = FakeDocument(name="BR-0001", status="Draft Created", items=[item])
 		with (
 			patch("working_time.platform_operations.frappe.get_doc", return_value=review),
+			patch(
+				"working_time.platform_operations.frappe.get_all",
+				return_value=[FakeDocument(name="SINV-0001", docstatus=0)],
+			),
 			patch("working_time.platform_operations.frappe.db.get_value", return_value=0),
 			self.assertRaises(FrappeValidationError),
 		):
@@ -742,7 +1071,10 @@ class TestPlatformOperations(unittest.TestCase):
 		review = FakeDocument(name="BR-0001", status="Draft Created", items=[item])
 		with (
 			patch("working_time.platform_operations.frappe.get_doc", return_value=review),
-			patch("working_time.platform_operations.frappe.db.get_value", return_value=1),
+			patch(
+				"working_time.platform_operations.frappe.get_all",
+				return_value=[FakeDocument(name="SINV-0001", docstatus=1)],
+			),
 		):
 			result = finalize_billing_review("BR-0001")
 

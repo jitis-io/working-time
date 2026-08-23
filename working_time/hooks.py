@@ -123,6 +123,9 @@ doc_events = {
 	},
 	"Sales Invoice": {
 		"validate": "working_time.customer_projects.apply_invoice_project",
+		"before_submit": "working_time.platform_operations.validate_billing_review_invoice_sources",
+		"on_submit": "working_time.platform_operations.synchronize_billing_reviews_for_invoice",
+		"on_cancel": "working_time.platform_operations.synchronize_billing_reviews_for_invoice",
 	},
 	"Task": {
 		"validate": "working_time.customer_projects.assign_issue_project_to_task",

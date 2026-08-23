@@ -59,6 +59,19 @@ drill-down lists.
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
 
+## Upgrade to 1.7.3
+
+Version 1.7.3 makes the reviewed time-billing handoff concurrency-safe and keeps its state aligned with
+ERPNext's native Sales Invoice and Timesheet links:
+
+- draft creation locks and revalidates the exact Timesheet Detail rows before it creates an invoice;
+- the generated Sales Invoice carries those native Timesheet references and rejects removed, duplicated or
+  already billed sources before submit;
+- submitting or cancelling a linked Sales Invoice synchronizes the Billing Review automatically;
+- cancelled or missing invoices remain claimed and are surfaced as failed instead of silently becoming
+  billable again;
+- an idempotent migration reconciles historical Billing Reviews that already contain invoice links.
+
 ## Upgrade to 1.7.2
 
 Version 1.7.2 stabilizes the customer-account flow without adding another work surface:
