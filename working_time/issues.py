@@ -73,7 +73,7 @@ def validate_issue_booking(issue: str, project: str | None, task: str | None = N
 			frappe.throw(_("The selected task belongs to another issue."))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_or_create_daily_working_time(employee: str, date: str):
 	from working_time.permissions import require_employee_access
 
@@ -87,7 +87,7 @@ def get_or_create_daily_working_time(employee: str, date: str):
 	return doc.as_dict()
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def get_or_create_my_working_time(date: str):
 	require_time_booking_identity()
 	employee = get_user_employee()
@@ -263,7 +263,7 @@ def _append_time_log(
 	return {"working_time": doc.name, "route": f"/app/working-time/{doc.name}"}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def book_time(
 	project: str,
 	date: str,
@@ -301,7 +301,7 @@ def book_time(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def add_issue_time(
 	issue: str,
 	date: str,
@@ -332,7 +332,7 @@ def add_issue_time(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def add_task_time(
 	task: str,
 	date: str,

@@ -142,7 +142,6 @@ scheduler_events = {
 	"daily": [
 		"working_time.reminders.create_daily_drafts",
 		"working_time.reminders.send_stale_reminders",
-		"working_time.reminders.send_month_end_reminders",
 	],
 	# 	"hourly": [
 	# 		"working_time.tasks.hourly"
@@ -353,6 +352,19 @@ working_time_custom_fields = {
 			"fieldtype": "Small Text",
 			"insert_after": "customer_description",
 			"read_only": 1,
+		},
+	],
+	"Sales Invoice Timesheet": [
+		{
+			"fieldname": "working_time_customer_snapshot",
+			"label": "Working Time Customer Snapshot",
+			"fieldtype": "Check",
+			"default": "0",
+			"insert_after": "description",
+			"read_only": 1,
+			"hidden": 1,
+			"no_copy": 1,
+			"set_only_once": 1,
 		},
 	],
 	"Attendance": [

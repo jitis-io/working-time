@@ -1,5 +1,14 @@
 # Migration and acceptance checklist
 
+## 1.8.0 customer-safe invoice evidence
+
+- Run the normal site migration and confirm `Sales Invoice Timesheet.working_time_customer_snapshot` exists.
+- Create a draft from Billing Review and verify every generated child row has the snapshot marker, a blank
+  Activity Type and a customer-safe description made only from date, ticket reference and customer text.
+- Render one invoice containing a native/unmarked row and confirm its description is not printed.
+- Verify a customer, company or Project mismatch on the referenced Sales Order aborts before invoice creation.
+- Verify mutating Working Time methods reject GET and the daily scheduler creates no blank draft by default.
+
 ## 1.7.3 billing-review consistency
 
 - Run the normal site migration to reconcile existing Billing Reviews with their linked Sales Invoices.
