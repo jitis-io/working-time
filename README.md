@@ -59,9 +59,9 @@ drill-down lists.
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
 
-## Upgrade to 1.8.0
+## Upgrade to 1.8.1
 
-Version 1.8.0 tightens the simplified Project-centred workflow and the customer invoice boundary:
+Version 1.8.1 tightens the simplified Project-centred workflow and the customer invoice boundary:
 
 - mutating HTTP methods are explicitly POST-only;
 - daily blank drafts are opt-in and duplicate reminder paths are removed;

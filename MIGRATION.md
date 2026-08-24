@@ -1,6 +1,6 @@
 # Migration and acceptance checklist
 
-## 1.8.0 customer-safe invoice evidence
+## 1.8.1 customer-safe invoice evidence
 
 - Run the normal site migration and confirm `Sales Invoice Timesheet.working_time_customer_snapshot` exists.
 - Create a draft from Billing Review and verify every generated child row has the snapshot marker, a blank
