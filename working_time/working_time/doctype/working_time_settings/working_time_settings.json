@@ -11,7 +11,7 @@
   "default_time_billing_item"
  ],
  "fields": [
-  {"fieldname": "create_daily_drafts", "fieldtype": "Check", "label": "Create Daily Drafts", "default": "1"},
+  {"fieldname": "create_daily_drafts", "fieldtype": "Check", "label": "Create Daily Drafts", "default": "0"},
   {"fieldname": "submission_deadline_days", "fieldtype": "Int", "label": "Submission Deadline (Days)", "default": "3"},
   {"fieldname": "send_reminders", "fieldtype": "Check", "label": "Send Reminders", "default": "1"},
   {"fieldname": "billing_section", "fieldtype": "Section Break", "label": "Billing"},

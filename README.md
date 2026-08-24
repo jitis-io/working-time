@@ -59,6 +59,18 @@ drill-down lists.
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
 
+## Upgrade to 1.8.1
+
+Version 1.8.1 tightens the simplified Project-centred workflow and the customer invoice boundary:
+
+- mutating HTTP methods are explicitly POST-only;
+- daily blank drafts are opt-in and duplicate reminder paths are removed;
+- Sales Order customer, company and Project relationships are revalidated before invoice creation;
+- invoice evidence freezes only the reviewed customer description and ticket reference;
+- an internal Activity Type is never copied to customer output;
+- every new Working-Time invoice row carries a hidden customer-snapshot marker so the print format can
+  suppress untrusted descriptions on native or historical rows.
+
 ## Upgrade to 1.7.3
 
 Version 1.7.3 makes the reviewed time-billing handoff concurrency-safe and keeps its state aligned with

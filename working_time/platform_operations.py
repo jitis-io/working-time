@@ -59,6 +59,36 @@ def _is_canonical_customer_project(project: Any) -> bool:
 	return frappe.db.get_value("Customer", customer, "customer_project") == _document_value(project, "name")
 
 
+def _sales_order_matches_project(sales_order: Any, project: Any) -> bool:
+	"""Require one submitted Sales Order to belong to the exact billing context."""
+	return bool(
+		sales_order
+		and _document_value(sales_order, "name") == _document_value(project, "sales_order")
+		and int(_document_value(sales_order, "docstatus") or 0) == 1
+		and _document_value(sales_order, "customer") == _document_value(project, "customer")
+		and _document_value(sales_order, "company") == _document_value(project, "company")
+		and _document_value(sales_order, "project") == _document_value(project, "name")
+	)
+
+
+def _sales_order_identity(name: str) -> Any:
+	return frappe.db.get_value(
+		"Sales Order",
+		name,
+		["name", "customer", "company", "project", "docstatus"],
+		as_dict=True,
+	)
+
+
+def _require_sales_order_for_project(sales_order: Any, project: Any) -> None:
+	if not _sales_order_matches_project(sales_order, project):
+		frappe.throw(
+			_(
+				"Sales Order {0} no longer belongs to the submitted customer, company and project context."
+			).format(_document_value(project, "sales_order") or _document_value(sales_order, "name") or "?")
+		)
+
+
 def _round_billable_hours(hours: Any) -> float:
 	"""Round a non-negative aggregate upward to the next quarter hour."""
 	value = max(_decimal(hours), Decimal(0))
@@ -162,8 +192,12 @@ def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, 
 		return "Locked", {"project": project}
 	if float(project.get("billing_rate") or 0) <= 0:
 		return "Locked", {"project": project}
-	sales_order = None if _is_canonical_customer_project(project) else project.get("sales_order")
-	if sales_order and not frappe.db.exists("Sales Order", {"name": sales_order, "docstatus": 1}):
+	is_canonical = _is_canonical_customer_project(project)
+	sales_order = None if is_canonical else project.get("sales_order")
+	if sales_order:
+		if not _sales_order_matches_project(_sales_order_identity(sales_order), project):
+			return "Missing Sales Order", {"project": project}
+	elif not is_canonical:
 		return "Missing Sales Order", {"project": project}
 	return "Eligible", {"project": project, "sales_order": sales_order}
 
@@ -226,7 +260,7 @@ def _billing_source(detail: Any, timesheet: Any, status: str, context: dict[str,
 		"project": project.name if project else detail.get("project"),
 		"task": detail.get("task"),
 		"issue": detail.get("issue"),
-		"customer_description": detail.get("customer_description") or detail.get("description"),
+		"customer_description": str(detail.get("customer_description") or "").strip(),
 		"sales_order": context.get("sales_order"),
 		"work_date": _billing_date(detail, timesheet),
 		"actual_hours": float(detail.get("hours") or 0),
@@ -237,7 +271,7 @@ def _billing_source(detail: Any, timesheet: Any, status: str, context: dict[str,
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_billing_review(period_start: str, period_end: str, project: str | None = None) -> dict[str, Any]:
 	_only_system_manager()
 	if period_start > period_end:
@@ -319,16 +353,14 @@ def create_billing_review(period_start: str, period_end: str, project: str | Non
 
 
 def _invoice_description(item: Any) -> str:
-	parts = [f"Leistungszeit am {item.work_date}", f"Projekt {item.project}"]
-	if item.task:
-		parts.append(f"Aufgabe {item.task}")
+	parts = [f"IT-Leistung am {_document_value(item, 'work_date')}"]
 	ticket_references = _document_value(item, "ticket_references")
-	customer_description = _document_value(item, "customer_description")
+	customer_description = str(_document_value(item, "customer_description") or "").strip()
 	if ticket_references:
-		parts.append(f"Ticket {ticket_references}")
+		parts.append(f"Support-Ticket {ticket_references}")
 	if customer_description:
 		parts.append(customer_description)
-	return " — ".join(parts)
+	return " - ".join(parts)
 
 
 def _sales_order_time_billing_row(sales_order: Any, item_code: str) -> Any:
@@ -476,9 +508,13 @@ def _invoice_timesheet_rows(items: list[Any], locked_sources: dict[str, Any]) ->
 					"to_time": _document_value(source, "to_time"),
 					"billing_hours": float(hours),
 					"billing_amount": float(hours * _decimal(item.rate)),
-					"activity_type": _document_value(source, "activity_type"),
-					"description": _document_value(source, "customer_description")
-					or _invoice_description(item),
+					# Activity Type is an internal classification and is never part of
+					# the customer-facing invoice evidence.
+					"activity_type": None,
+					# Freeze complete customer-facing evidence on the invoice. Never
+					# fall back to the internal Timesheet Detail description.
+					"description": _invoice_description(item),
+					"working_time_customer_snapshot": 1,
 					"project_name": _document_value(source, "project_name") or item.project,
 				}
 			)
@@ -623,7 +659,7 @@ def validate_billing_review_invoice_sources(doc: Any, method: str | None = None)
 			frappe.throw(_("Sales Invoice Timesheet {0} references the wrong Timesheet.").format(reference))
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	_only_system_manager()
 	# Serialize draft creation for this review. Client retries and concurrent
@@ -678,12 +714,19 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 			frappe.throw(
 				_("Project time billing settings changed after the preview for {0}.").format(item.project)
 			)
-		sales_order_name = None if is_canonical else item.sales_order
+		if is_canonical:
+			sales_order_name = None
+		elif not project_doc.get("sales_order") or item.sales_order != project_doc.get("sales_order"):
+			frappe.throw(_("Project Sales Order changed after the preview for {0}.").format(item.project))
+		else:
+			sales_order_name = project_doc.get("sales_order")
 		groups.setdefault((item.customer, sales_order_name), []).append(item)
 	invoice_groups: list[dict[str, Any]] = []
 	for (customer, sales_order_name), items in groups.items():
 		if sales_order_name:
 			sales_order = frappe.get_doc("Sales Order", sales_order_name)
+			for item in items:
+				_require_sales_order_for_project(sales_order, project_context[item.project][0])
 			time_item_row = _sales_order_time_billing_row(sales_order, settings.default_time_billing_item)
 			so_detail = str(_document_value(time_item_row, "name"))
 			sales_order_rate = _decimal(_document_value(time_item_row, "rate"))
@@ -761,7 +804,7 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 	return {"name": review.name, "sales_invoices": invoices, "created": True}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_project_time_invoice_draft(project: str, period_start: str, period_end: str) -> dict[str, Any]:
 	"""Create exactly one draft invoice from one project's monthly preview."""
 	_only_system_manager()
@@ -786,7 +829,7 @@ def create_project_time_invoice_draft(project: str, period_start: str, period_en
 		raise
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def finalize_billing_review(review_name: str) -> dict[str, Any]:
 	"""Mark a billing review invoiced after its draft invoices were submitted manually."""
 	_only_system_manager()

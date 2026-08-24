@@ -50,7 +50,10 @@ FrappeValidationError = getattr(frappe, "ValidationError", RuntimeError)
 
 from working_time.platform_operations import (
 	_aggregate_billing_sources,
+	_billing_source,
 	_billing_status,
+	_invoice_description,
+	_invoice_timesheet_rows,
 	_lock_billing_sources,
 	_review_source_items,
 	_round_billable_hours,
@@ -188,6 +191,74 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(first["ticket_references"], "ISS-2026-00001, ISS-2026-00002")
 		self.assertEqual(first["customer_description"], "First intervention; Second intervention")
 
+	def test_internal_timesheet_description_never_reaches_invoice_text(self):
+		secret = "INTERNAL: credentials and technician-only diagnostic notes"
+		detail = FakeDocument(
+			name="ROW-0001",
+			project="PROJ-INTERNAL-ID",
+			task="TASK-INTERNAL-ID",
+			issue=None,
+			customer_description="  ",
+			description=secret,
+			from_time="2026-08-01 09:00:00",
+			hours=0.2,
+			billing_hours=0.2,
+			is_billable=1,
+		)
+		project = FakeDocument(name="PROJ-INTERNAL-ID", customer="CUST-0001", billing_rate=120)
+		source = _billing_source(
+			detail,
+			FakeDocument(name="TS-0001", start_date="2026-08-01"),
+			"Eligible",
+			{"project": project, "sales_order": None},
+		)
+		self.assertEqual(source["customer_description"], "")
+
+		item = FakeDocument(
+			project="PROJ-INTERNAL-ID",
+			task="TASK-INTERNAL-ID",
+			work_date="2026-08-01",
+			ticket_references="",
+			customer_description="",
+			rate=120,
+			timesheet_detail="ROW-0001",
+			source_details_json="",
+		)
+		locked_source = _locked_source()
+		locked_source.customer_description = ""
+		locked_source.description = secret
+		invoice_text = _invoice_description(item)
+		timesheet_text = _invoice_timesheet_rows([item], {"ROW-0001": locked_source})[0]["description"]
+		self.assertEqual(invoice_text, "IT-Leistung am 2026-08-01")
+		self.assertEqual(timesheet_text, invoice_text)
+		for forbidden in (secret, "PROJ-INTERNAL-ID", "TASK-INTERNAL-ID"):
+			self.assertNotIn(forbidden, invoice_text)
+			self.assertNotIn(forbidden, timesheet_text)
+
+	def test_invoice_timesheet_snapshot_keeps_ticket_and_customer_description_together(self):
+		item = FakeDocument(
+			project="PROJ-0001",
+			work_date="2026-08-01",
+			ticket_references="ISS-2026-00001",
+			customer_description="WLAN-Störung behoben",
+			rate=120,
+			timesheet_detail="ROW-0001",
+			source_details_json="",
+		)
+		locked_source = _locked_source()
+		locked_source.customer_description = "WLAN-Störung behoben"
+		locked_source.description = "Interne Diagnose und Zugangsdaten"
+
+		row = _invoice_timesheet_rows([item], {"ROW-0001": locked_source})[0]
+
+		self.assertEqual(
+			row["description"],
+			"IT-Leistung am 2026-08-01 - Support-Ticket ISS-2026-00001 - WLAN-Störung behoben",
+		)
+		self.assertNotIn("Interne Diagnose", row["description"])
+		self.assertIsNone(row["activity_type"])
+		self.assertEqual(row["working_time_customer_snapshot"], 1)
+
 	def test_claimed_billing_source_wins_over_changed_project_configuration(self):
 		detail = FakeDocument(name="ROW-0001", project="PROJ-0001")
 		with patch("working_time.platform_operations.frappe.get_doc") as get_doc:
@@ -276,14 +347,12 @@ class TestPlatformOperations(unittest.TestCase):
 		)
 		with (
 			patch("working_time.platform_operations.frappe.get_doc", return_value=project),
-			patch("working_time.platform_operations.frappe.db.get_value", return_value=None),
-			patch("working_time.platform_operations.frappe.db.exists") as exists,
+			patch("working_time.platform_operations.frappe.db.get_value", return_value="PROJ-0001"),
 		):
 			status, context = _billing_status(detail, {})
 
 		self.assertEqual(status, "Eligible")
 		self.assertIs(context["project"], project)
-		exists.assert_not_called()
 
 		project.time_billable = 0
 		project.billing_model = "Time and Material"
@@ -291,6 +360,62 @@ class TestPlatformOperations(unittest.TestCase):
 			status, context = _billing_status(detail, {})
 
 		self.assertEqual(status, "Locked")
+		self.assertIs(context["project"], project)
+
+	def test_billing_review_sales_order_context_fails_closed(self):
+		detail = FakeDocument(name="ROW-0001", project="PROJ-0001")
+		project = FakeDocument(
+			name="PROJ-0001",
+			customer="CUST-0001",
+			company="JITIS",
+			time_billable=1,
+			billing_rate=120,
+			sales_order="SO-0001",
+		)
+		valid = {
+			"name": "SO-0001",
+			"customer": "CUST-0001",
+			"company": "JITIS",
+			"project": "PROJ-0001",
+			"docstatus": 1,
+		}
+		invalid_orders = [
+			None,
+			{**valid, "customer": "CUST-OTHER"},
+			{**valid, "company": "OTHER"},
+			{**valid, "project": "PROJ-OTHER"},
+			{**valid, "docstatus": 0},
+		]
+
+		for sales_order in invalid_orders:
+			with self.subTest(sales_order=sales_order):
+
+				def get_value(doctype, name, fields, current_sales_order=sales_order, **kwargs):
+					if doctype == "Customer":
+						return "PROJ-CANONICAL"
+					if doctype == "Sales Order":
+						self.assertEqual(name, "SO-0001")
+						self.assertEqual(fields, ["name", "customer", "company", "project", "docstatus"])
+						self.assertEqual(kwargs, {"as_dict": True})
+						return current_sales_order
+					raise AssertionError((doctype, name, fields, kwargs))
+
+				with (
+					patch("working_time.platform_operations.frappe.get_doc", return_value=project),
+					patch("working_time.platform_operations.frappe.db.get_value", side_effect=get_value),
+				):
+					status, context = _billing_status(detail, {})
+
+				self.assertEqual(status, "Missing Sales Order")
+				self.assertIs(context["project"], project)
+
+		project.sales_order = None
+		with (
+			patch("working_time.platform_operations.frappe.get_doc", return_value=project),
+			patch("working_time.platform_operations.frappe.db.get_value", return_value="PROJ-CANONICAL"),
+		):
+			status, context = _billing_status(detail, {})
+		self.assertEqual(status, "Missing Sales Order")
 		self.assertIs(context["project"], project)
 
 	def test_project_scoped_billing_review_accepts_permanent_project_without_sales_order(self):
@@ -633,7 +758,10 @@ class TestPlatformOperations(unittest.TestCase):
 		)
 		sales_order = FakeDocument(
 			name="SO-0001",
+			customer="CUST-0001",
 			company="JITIS",
+			project="PROJ-0001",
+			docstatus=1,
 			currency="EUR",
 			items=[
 				FakeDocument(
@@ -689,6 +817,83 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(invoice.values["items"][0]["so_detail"], "SOI-0001")
 		self.assertEqual(invoice.values["timesheets"][0]["timesheet_detail"], "ROW-0001")
 
+	def test_invoice_draft_revalidates_submitted_sales_order_context(self):
+		item = FakeDocument(
+			status="Eligible",
+			customer="CUST-0001",
+			sales_order="SO-0001",
+			project="PROJ-0001",
+			work_date="2026-08-01",
+			hours=0.25,
+			rate=120,
+			timesheet_detail="ROW-0001",
+			source_details_json='[{"timesheet":"TS-0001","timesheet_detail":"ROW-0001"}]',
+			sales_invoice=None,
+		)
+		review = FakeDocument(name="BR-0001", status="Preview", items=[item])
+		project = FakeDocument(
+			name="PROJ-0001",
+			customer="CUST-0001",
+			company="JITIS",
+			time_billable=1,
+			billing_rate=120,
+			sales_order="SO-0001",
+		)
+		valid = {
+			"name": "SO-0001",
+			"customer": "CUST-0001",
+			"company": "JITIS",
+			"project": "PROJ-0001",
+			"docstatus": 1,
+			"currency": "EUR",
+			"items": [],
+		}
+		invalid_orders = [
+			{**valid, "customer": "CUST-OTHER"},
+			{**valid, "company": "OTHER"},
+			{**valid, "project": "PROJ-OTHER"},
+			{**valid, "docstatus": 0},
+		]
+
+		for values in invalid_orders:
+			with self.subTest(values=values):
+				sales_order = FakeDocument(**values)
+
+				def get_doc(doctype, name=None, current_sales_order=sales_order):
+					if doctype == "Billing Review":
+						return review
+					if doctype == "Project":
+						return project
+					if doctype == "Sales Order":
+						return current_sales_order
+					if isinstance(doctype, dict):
+						self.fail("Sales Invoice must not be built before Sales Order context validation")
+					raise AssertionError((doctype, name))
+
+				with (
+					patch(
+						"working_time.platform_operations._settings",
+						return_value=FakeDocument(default_time_billing_item="TIME"),
+					),
+					patch(
+						"working_time.platform_operations._lock_billing_sources",
+						return_value={"ROW-0001": _locked_source()},
+					),
+					patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
+					patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
+					patch("working_time.platform_operations.frappe.get_all", return_value=[]),
+					patch(
+						"working_time.platform_operations.frappe.db.get_value",
+						return_value="PROJ-CANONICAL",
+					),
+					self.assertRaisesRegex(FrappeValidationError, "customer, company and project context"),
+				):
+					create_billing_invoice_drafts("BR-0001")
+
+				self.assertEqual(review.status, "Preview")
+				self.assertEqual(item.status, "Eligible")
+				self.assertIsNone(item.sales_invoice)
+
 	def test_invoice_creation_rejects_rate_drift_before_building_invoice(self):
 		item = FakeDocument(
 			status="Eligible",
@@ -714,7 +919,10 @@ class TestPlatformOperations(unittest.TestCase):
 		)
 		sales_order = FakeDocument(
 			name="SO-0001",
+			customer="CUST-0001",
 			company="JITIS",
+			project="PROJ-0001",
+			docstatus=1,
 			currency="EUR",
 			items=[
 				FakeDocument(
@@ -794,7 +1002,13 @@ class TestPlatformOperations(unittest.TestCase):
 		):
 			with self.subTest(sales_order_items=sales_order_items):
 				sales_order = FakeDocument(
-					name="SO-0001", company="JITIS", currency="EUR", items=sales_order_items
+					name="SO-0001",
+					customer="CUST-0001",
+					company="JITIS",
+					project="PROJ-0001",
+					docstatus=1,
+					currency="EUR",
+					items=sales_order_items,
 				)
 
 				def get_doc(doctype, name=None, current_sales_order=sales_order):

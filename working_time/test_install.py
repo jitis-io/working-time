@@ -59,3 +59,9 @@ class TestInstall(TestCase):
 		self.assertTrue(meta.has_field("customer_account_overview"))
 		self.assertTrue(meta.has_field("time_billable"))
 		self.assertTrue(frappe.get_meta("Customer").has_field("customer_project"))
+		snapshot_field = frappe.get_meta("Sales Invoice Timesheet").get_field(
+			"working_time_customer_snapshot"
+		)
+		self.assertIsNotNone(snapshot_field)
+		self.assertEqual(snapshot_field.fieldtype, "Check")
+		self.assertTrue(snapshot_field.read_only)

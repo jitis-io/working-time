@@ -16,6 +16,7 @@ pybabel compile \
 	--input-file working_time/locale/en.po \
 	--output-file /tmp/working-time-en.mo
 python -m unittest \
+	working_time.test_http_contract \
 	working_time.test_platform_operations \
 	working_time.test_permissions \
 	working_time.test_reminders \
