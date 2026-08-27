@@ -35,6 +35,18 @@
 		};
 	}
 
+	async function open_booked_daily_close(result) {
+		const working_time =
+			typeof result?.working_time === "string" ? result.working_time.trim() : "";
+		if (!working_time) return false;
+		try {
+			await frappe.set_route("Form", "Working Time", working_time);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	async function build_dialog(options) {
 		const requested_date = options.date || frappe.datetime.get_today();
 		let context;
@@ -143,6 +155,13 @@
 					fieldtype: "Small Text",
 					label: __("Internal Note"),
 				},
+				{
+					fieldname: "open_daily_close",
+					fieldtype: "Check",
+					label: __("Open daily close after booking"),
+					default: 0,
+					description: __("The daily close for the selected date will open."),
+				},
 			],
 			primary_action_label: __("Book time"),
 			primary_action: async () => {
@@ -189,6 +208,12 @@
 								indicator: "orange",
 							});
 						}
+					}
+					if (values.open_daily_close && !(await open_booked_daily_close(result))) {
+						frappe.show_alert({
+							message: __("Time was booked, but the daily close could not be opened."),
+							indicator: "orange",
+						});
 					}
 				} catch (error) {
 					frappe.msgprint({
