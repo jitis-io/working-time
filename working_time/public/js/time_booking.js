@@ -35,7 +35,7 @@
 		};
 	}
 
-	async function open_booked_daily_close(result) {
+	async function start_booked_daily_close_navigation(result) {
 		const working_time =
 			typeof result?.working_time === "string" ? result.working_time.trim() : "";
 		if (!working_time) return false;
@@ -209,9 +209,14 @@
 							});
 						}
 					}
-					if (values.open_daily_close && !(await open_booked_daily_close(result))) {
+					if (
+						values.open_daily_close &&
+						!(await start_booked_daily_close_navigation(result))
+					) {
 						frappe.show_alert({
-							message: __("Time was booked, but the daily close could not be opened."),
+							message: __(
+								"Time was booked, but navigation to the daily close could not be started."
+							),
 							indicator: "orange",
 						});
 					}

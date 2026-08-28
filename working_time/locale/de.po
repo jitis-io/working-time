@@ -947,8 +947,8 @@ msgid "The daily close for the selected date will open."
 msgstr "Der Tagesabschluss für das ausgewählte Datum wird geöffnet."
 
 #: working_time/public/js/time_booking.js
-msgid "Time was booked, but the daily close could not be opened."
-msgstr "Die Zeit wurde gebucht, aber der Tagesabschluss konnte nicht geöffnet werden."
+msgid "Time was booked, but navigation to the daily close could not be started."
+msgstr "Die Zeit wurde gebucht, aber die Navigation zum Tagesabschluss konnte nicht gestartet werden."
 
 #: working_time/customer_projects.py:158
 msgid "Project name {0} is already used by project {1} for another customer."

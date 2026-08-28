@@ -66,8 +66,8 @@ submission behavior:
 
 - **Book time** can optionally open the exact daily Working Time record returned by the server;
 - existing post-booking callbacks still run before navigation;
-- a navigation failure is reported separately and never misrepresents the already saved time as a
-  failed booking.
+- a failure to start navigation is reported separately and never misrepresents the already saved
+  time as a failed booking.
 
 ## Upgrade to 1.8.1
 

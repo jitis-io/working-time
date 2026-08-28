@@ -423,7 +423,7 @@ msgid "The daily close for the selected date will open."
 msgstr ""
 
 #: working_time/public/js/time_booking.js
-msgid "Time was booked, but the daily close could not be opened."
+msgid "Time was booked, but navigation to the daily close could not be started."
 msgstr ""
 
 #: working_time/customer_projects.py:158
