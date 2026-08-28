@@ -5,7 +5,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time 1.8.1\n"
+"Project-Id-Version: Working Time 1.8.2\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
 "POT-Creation-Date: 2026-08-21 00:00+0000\n"
 "PO-Revision-Date: 2026-08-21 00:00+0000\n"
@@ -937,6 +937,18 @@ msgstr "Aktiviere die Zeitabrechnung im Projekt, um diese Stunden abzurechnen."
 #: working_time/public/js/time_booking.js:172
 msgid "Time saved in the daily close"
 msgstr "Zeit im Tagesabschluss gespeichert"
+
+#: working_time/public/js/time_booking.js
+msgid "Open daily close after booking"
+msgstr "Tagesabschluss nach der Buchung öffnen"
+
+#: working_time/public/js/time_booking.js
+msgid "The daily close for the selected date will open."
+msgstr "Der Tagesabschluss für das ausgewählte Datum wird geöffnet."
+
+#: working_time/public/js/time_booking.js
+msgid "Time was booked, but navigation to the daily close could not be started."
+msgstr "Die Zeit wurde gebucht, aber die Navigation zum Tagesabschluss konnte nicht gestartet werden."
 
 #: working_time/customer_projects.py:158
 msgid "Project name {0} is already used by project {1} for another customer."

@@ -59,6 +59,16 @@ drill-down lists.
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
 
+## Upgrade to 1.8.2
+
+Version 1.8.2 makes the duration-first workflow more direct without changing any billing or
+submission behavior:
+
+- **Book time** can optionally open the exact daily Working Time record returned by the server;
+- existing post-booking callbacks still run before navigation;
+- a failure to start navigation is reported separately and never misrepresents the already saved
+  time as a failed booking.
+
 ## Upgrade to 1.8.1
 
 Version 1.8.1 tightens the simplified Project-centred workflow and the customer invoice boundary:

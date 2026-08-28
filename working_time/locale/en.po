@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time 1.8.1\n"
+"Project-Id-Version: Working Time 1.8.2\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
 "POT-Creation-Date: 2026-08-21 00:00+0000\n"
 "PO-Revision-Date: 2026-08-21 00:00+0000\n"
@@ -412,6 +412,18 @@ msgstr ""
 
 #: working_time/public/js/time_booking.js:172
 msgid "Time saved in the daily close"
+msgstr ""
+
+#: working_time/public/js/time_booking.js
+msgid "Open daily close after booking"
+msgstr ""
+
+#: working_time/public/js/time_booking.js
+msgid "The daily close for the selected date will open."
+msgstr ""
+
+#: working_time/public/js/time_booking.js
+msgid "Time was booked, but navigation to the daily close could not be started."
 msgstr ""
 
 #: working_time/customer_projects.py:158
