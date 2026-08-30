@@ -667,6 +667,16 @@ class TestCustomerProjects(unittest.TestCase):
 		)
 		self.assertEqual(result, {"matched": 3, "updated": 1, "skipped": 2})
 
+	def test_canonical_customer_cannot_be_reassigned_or_cleared(self):
+		for customer in ("CUST-OTHER", None):
+			project = FakeDocument(name="PROJ-ACCOUNT", customer=customer)
+			project.get_doc_before_save = lambda: FakeDocument(customer="CUST-OWNER")
+			with (
+				patch("working_time.customer_projects.frappe.db.get_value", return_value=project.name),
+				self.assertRaisesRegex(FrappeValidationError, "cannot be changed"),
+			):
+				protect_customer_account_project(project, "validate")
+
 	def test_customer_account_project_has_clean_close_and_delete_guard(self):
 		for method, status, is_active in (
 			("validate", "Completed", "Yes"),

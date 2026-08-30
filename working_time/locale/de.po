@@ -1139,3 +1139,21 @@ msgstr "Zuletzt von Ihnen bearbeitet"
 #: working_time/platform_operations.py:562
 msgid "Set a Default Currency for company {0} before creating invoice drafts."
 msgstr "Lege vor dem Erstellen von Rechnungsentwürfen eine Standardwährung für das Unternehmen {0} fest."
+
+msgid "Invalid booking request identifier."
+msgstr "Ungültige Kennung der Zeitbuchung."
+
+msgid "This booking request was already saved. Check the daily close before booking again."
+msgstr "Diese Zeitbuchung wurde bereits gespeichert. Prüfe den Tagesabschluss, bevor du erneut buchst."
+
+msgid "This day is already submitted. Cancel and amend it before adding time."
+msgstr "Dieser Tag ist bereits eingereicht. Storniere und ändere ihn, bevor du weitere Zeit hinzufügst."
+
+msgid "The customer of a permanent customer account cannot be changed."
+msgstr "Der Kunde eines dauerhaften Kundenkontos kann nicht geändert werden."
+
+msgid "The customer cannot be changed after work or billing records reference this project."
+msgstr "Der Kunde kann nicht geändert werden, sobald Arbeits- oder Abrechnungsbelege dieses Projekt referenzieren."
+
+msgid "A concurrent booking interrupted this request. Keep this dialog open and book again with the same values."
+msgstr "Eine gleichzeitige Buchung hat diesen Vorgang unterbrochen. Lass diesen Dialog geöffnet und buche mit denselben Angaben erneut."

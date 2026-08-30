@@ -392,6 +392,30 @@ def protect_customer_account_project(doc: Any, method: str | None = None) -> Non
 	"""Keep the canonical customer account open and replace Frappe's raw link error."""
 
 	customer = _document_value(doc, "customer")
+	get_before_save = getattr(doc, "get_doc_before_save", None)
+	previous = get_before_save() if callable(get_before_save) else None
+	previous_customer = _document_value(previous, "customer") if previous else None
+	if previous and previous_customer != customer:
+		if (
+			previous_customer
+			and frappe.db.get_value("Customer", previous_customer, "customer_project") == doc.name
+		):
+			frappe.throw(_("The customer of a permanent customer account cannot be changed."))
+		if any(
+			frappe.db.exists(doctype, {"project": doc.name})
+			for doctype in (
+				"Issue",
+				"Task",
+				"Working Time Log",
+				"Timesheet Detail",
+				"Sales Order",
+				"Sales Invoice Item",
+				"Purchase Invoice Item",
+			)
+		):
+			frappe.throw(
+				_("The customer cannot be changed after work or billing records reference this project.")
+			)
 	if not customer:
 		return
 	linked_project = frappe.db.get_value("Customer", customer, "customer_project")

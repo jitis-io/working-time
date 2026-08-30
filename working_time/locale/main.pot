@@ -1128,3 +1128,21 @@ msgstr ""
 #: working_time/platform_operations.py:562
 msgid "Set a Default Currency for company {0} before creating invoice drafts."
 msgstr ""
+
+msgid "Invalid booking request identifier."
+msgstr ""
+
+msgid "This booking request was already saved. Check the daily close before booking again."
+msgstr ""
+
+msgid "This day is already submitted. Cancel and amend it before adding time."
+msgstr ""
+
+msgid "The customer of a permanent customer account cannot be changed."
+msgstr ""
+
+msgid "The customer cannot be changed after work or billing records reference this project."
+msgstr ""
+
+msgid "A concurrent booking interrupted this request. Keep this dialog open and book again with the same values."
+msgstr ""

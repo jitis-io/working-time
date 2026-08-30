@@ -23,6 +23,20 @@
 	namespace.plain_text = plain_text;
 	namespace.safe_error = safe_error;
 
+	function save_booking(args) {
+		return new Promise((resolve, reject) => {
+			frappe.xcall("working_time.issues.book_time", args, "POST", {
+				error_handlers: {
+					// Frappe's native deadlock handler may leave xcall pending. Settle
+					// this action so the unchanged dialog and UUID can be retried.
+					QueryDeadlockError: () => reject(new Error(__(
+						"A concurrent booking interrupted this request. Keep this dialog open and book again with the same values."
+					))),
+				},
+			}).then(resolve, reject);
+		});
+	}
+
 	function allowed_link_query(doctype, rows, filter) {
 		const names = (rows || [])
 			.filter(filter || (() => true))
@@ -75,6 +89,8 @@
 		const issues = Array.isArray(context.issues) ? context.issues : [];
 		const tasks = Array.isArray(context.tasks) ? context.tasks : [];
 		let submitting = false;
+		// Keep the same key after a lost response; a retry must not add another row.
+		const booking_request_id = crypto.randomUUID();
 		let dialog;
 
 		dialog = new frappe.ui.Dialog({
@@ -182,7 +198,7 @@
 				const primary_button = dialog.get_primary_btn();
 				primary_button.prop("disabled", true).attr("aria-busy", "true");
 				try {
-					const result = await frappe.xcall("working_time.issues.book_time", {
+					const result = await save_booking({
 						...compact_args({
 							project: values.project,
 							issue: values.issue,
@@ -192,6 +208,7 @@
 							customer_description: values.customer_description,
 							internal_note: values.internal_note,
 							billable: values.billable ? 1 : 0,
+							booking_request_id,
 						}),
 					});
 					dialog.hide();

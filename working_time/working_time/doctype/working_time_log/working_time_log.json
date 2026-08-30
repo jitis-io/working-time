@@ -17,9 +17,27 @@
   "is_break",
   "section_break_9",
   "from_time",
-  "to_time"
+  "to_time",
+  "booking_request_id",
+  "booking_request_hash"
  ],
  "fields": [
+  {
+   "fieldname": "booking_request_id",
+   "fieldtype": "Data",
+   "label": "Booking Request ID",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "booking_request_hash",
+   "fieldtype": "Data",
+   "label": "Booking Request Hash",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
   {
    "columns": 2,
    "fieldname": "duration",

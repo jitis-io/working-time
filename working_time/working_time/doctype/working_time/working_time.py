@@ -49,9 +49,19 @@ class WorkingTime(Document):
 			self.billable_pct = round(self.billable_time / self.working_time * 100, 0)
 
 	def validate(self):
-		duplicate = frappe.db.exists(
+		if self.is_new() and self.amended_from:
+			# Native Amend deliberately copies even no_copy fields. Request identity
+			# belongs to the original submission, never to the corrected document.
+			for log in self.time_logs:
+				log.booking_request_id = None
+				log.booking_request_hash = None
+		# Also protect direct form saves, not only the duration-first booking API.
+		frappe.db.sql("select name from `tabEmployee` where name=%s for update", (self.employee,))
+		duplicate = frappe.db.get_value(
 			"Working Time",
 			{"employee": self.employee, "date": self.date, "docstatus": ("!=", 2), "name": ("!=", self.name)},
+			"name",
+			for_update=True,
 		)
 		if duplicate:
 			frappe.throw(_("Working Time {0} already exists for this employee and date.").format(duplicate))
@@ -433,6 +443,15 @@ def validate_billable_percentage(log) -> None:
 
 
 def validate_log_links(log) -> None:
+	# Direct Working Time form saves must obey the same access boundary as Book time.
+	for doctype, name in (("Project", log.project), ("Task", log.task)):
+		if name and not frappe.has_permission(doctype, "read", doc=frappe.get_doc(doctype, name)):
+			message = (
+				_("You are not permitted to read this project.")
+				if doctype == "Project"
+				else _("You are not permitted to read this task.")
+			)
+			frappe.throw(message, frappe.PermissionError)
 	if log.task and frappe.db.get_value("Task", log.task, "project") != log.project:
 		frappe.throw(_("Task in row {0} does not belong to the selected project.").format(log.idx))
 	if log.issue:

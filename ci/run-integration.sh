@@ -3,6 +3,7 @@
 set -euo pipefail
 
 readonly APP_DIR="${APP_DIR:-/workspace}"
+readonly APP_SOURCE_DIR="/home/runner/working_time"
 readonly BENCH_DIR="${BENCH_DIR:-/home/runner/frappe-bench}"
 readonly DB_HOST="${DB_HOST:-mariadb}"
 readonly DB_ROOT_USERNAME="${DB_ROOT_USERNAME:-root}"
@@ -19,9 +20,19 @@ done
 redis-server --daemonize yes --port 13000 --save "" --appendonly no
 redis-server --daemonize yes --port 11000 --save "" --appendonly no
 
-# Keep Bench's own Git operations outside the mounted source checkout. A local
-# Git worktree uses a host-only .git pointer that is intentionally unavailable
-# inside the disposable CI container.
+# Bench get-app requires usable local Git metadata, even with --soft-link.
+# A Windows worktree's .git file points outside the image. Build an isolated
+# source copy without host metadata; never initialise or modify the host tree.
+mkdir -p "$APP_SOURCE_DIR"
+tar -C "$APP_DIR" --exclude='./.git' -cf - . | tar -C "$APP_SOURCE_DIR" -xf -
+git -C "$APP_SOURCE_DIR" init --quiet
+# Bench also inspects HEAD. This is disposable fixture metadata, not a commit
+# to the user's worktree or any remote repository.
+git -C "$APP_SOURCE_DIR" add .
+git -C "$APP_SOURCE_DIR" -c user.name='Disposable CI' -c user.email='ci@example.invalid' \
+	commit --quiet -m 'Disposable integration source snapshot'
+
+# Keep Bench's own Git operations outside the source checkout.
 cd /home/runner
 bench init \
 	--frappe-branch v16.31.0 \
@@ -37,7 +48,7 @@ bench get-app --skip-assets --branch v16.32.3 erpnext https://github.com/frappe/
 test "$(git -C apps/erpnext rev-parse HEAD)" = "$ERPNEXT_COMMIT"
 bench get-app --skip-assets --branch v16.16.0 hrms https://github.com/frappe/hrms.git
 test "$(git -C apps/hrms rev-parse HEAD)" = "$HRMS_COMMIT"
-bench get-app --skip-assets --soft-link working_time "$APP_DIR"
+bench get-app --skip-assets --soft-link "$APP_SOURCE_DIR"
 bench setup requirements --dev
 
 bench new-site \
@@ -51,6 +62,8 @@ bench new-site \
 
 bench --site "$SITE_NAME" install-app working_time
 bench set-config --global chromium_path "$(command -v chromium)"
+bench --site "$SITE_NAME" migrate
+# Re-running normal migration must preserve the installed schema and data.
 bench --site "$SITE_NAME" migrate
 bench build --app working_time
 bench --site "$SITE_NAME" set-config allow_tests true

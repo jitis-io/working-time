@@ -5,6 +5,7 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
+from frappe import PermissionError as FrappePermissionError
 from frappe import ValidationError, _dict
 
 from working_time.working_time.doctype.working_time.working_time import (
@@ -17,11 +18,25 @@ from working_time.working_time.doctype.working_time.working_time import (
 	group_timesheet_logs,
 	should_enforce_billable_percentages,
 	time_difference_seconds,
+	validate_log_links,
 )
 from working_time.working_time.doctype.working_time_log.working_time_log import WorkingTimeLog
 
 
 class TestWorkingTime(unittest.TestCase):
+	def test_direct_time_rows_require_project_and_task_read_permission(self):
+		for forbidden in ("Project", "Task"):
+			with (
+				self.subTest(forbidden=forbidden),
+				patch("frappe.get_doc", return_value=_dict()),
+				patch(
+					"frappe.has_permission",
+					side_effect=lambda doctype, *args, forbidden=forbidden, **kwargs: doctype != forbidden,
+				),
+				self.assertRaises(FrappePermissionError),
+			):
+				validate_log_links(_dict(project="_Test Project", task="_Test Task", issue=None, idx=1))
+
 	def test_time_log_starting_at_midnight_keeps_its_duration(self):
 		log = _dict(from_time=timedelta(0), to_time=timedelta(hours=1), duration=0)
 
