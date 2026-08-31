@@ -394,7 +394,10 @@ def _sales_order_time_billing_row(sales_order: Any, item_code: str) -> Any:
 	return row
 
 
-def assert_timesheet_unclaimed(timesheet: Any) -> None:
+def assert_timesheet_unclaimed(timesheet: Any, method: str | None = None) -> None:
+	# Native Desk Cancel All visits linked Timesheets before Working Time.
+	# Enforce the same source guard there, not only on the parent cancel path.
+	del method
 	claimed = {}
 	for item in frappe.get_all(
 		"Billing Review Item", fields=["timesheet_detail", "source_details_json", "status"]
@@ -489,7 +492,12 @@ def _lock_billing_sources(source_items: dict[str, Any]) -> dict[str, Any]:
 			Decimal(0),
 		)
 		preview_hours = _document_value(item, "raw_billable_hours")
-		if preview_hours is not None and current_hours != _decimal(preview_hours):
+		# Compare using the persisted field's precision and Frappe rounding policy.
+		# Native Timesheet Detail hours can have more decimals than the review snapshot.
+		precision = frappe.get_precision("Billing Review Item", "raw_billable_hours")
+		if preview_hours is not None and frappe.utils.flt(current_hours, precision) != frappe.utils.flt(
+			preview_hours, precision
+		):
 			frappe.throw(_("Billing hours changed after the preview for project {0}.").format(item.project))
 	return locked
 

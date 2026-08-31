@@ -78,3 +78,29 @@ class TimeBookingClientScriptTest(TestCase):
 				'msgid "Time was booked, but navigation to the daily close could not be started."',
 				catalog,
 			)
+
+
+class ProjectDailyCloseClientScriptTest(TestCase):
+	def test_daily_close_runtime_unlocks_after_native_conflict(self):
+		node = shutil.which("node")
+		self.assertIsNotNone(node, "Node.js is required for the Daily close runtime test")
+		harness = APP_ROOT.parent / "ci" / "test-project-daily-close-runtime.mjs"
+		completed = subprocess.run(
+			[node, str(harness)],
+			cwd=APP_ROOT.parent,
+			capture_output=True,
+			text=True,
+			timeout=30,
+			check=False,
+		)
+		self.assertEqual(
+			completed.returncode,
+			0,
+			f"Daily close runtime test failed:\n{completed.stdout}\n{completed.stderr}",
+		)
+
+	def test_daily_close_conflict_message_is_translatable(self):
+		message = "A concurrent request interrupted opening the daily close. Please try again."
+		for filename in ("de.po", "en.po", "main.pot"):
+			catalog = (APP_ROOT / "locale" / filename).read_text(encoding="utf-8")
+			self.assertIn(f'msgid "{message}"', catalog)

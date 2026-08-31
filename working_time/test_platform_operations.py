@@ -33,10 +33,12 @@ def _bootstrap_frappe_stub() -> None:
 	frappe.get_doc = lambda *args, **kwargs: None
 	frappe.get_list = lambda *args, **kwargs: []
 	frappe.get_single = lambda *args, **kwargs: None
+	frappe.get_precision = lambda *args, **kwargs: 6
 	frappe.has_permission = lambda *args, **kwargs: True
 	frappe.session = types.SimpleNamespace(user="test@example.com")
 	frappe_utils = types.ModuleType("frappe.utils")
 	frappe_utils.nowdate = lambda: "2026-08-20"
+	frappe_utils.flt = lambda value, precision: round(float(value), precision)
 	frappe.utils = frappe_utils
 	sys.modules["frappe"] = frappe
 	sys.modules["frappe.utils"] = frappe_utils
@@ -317,6 +319,29 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertIn("for update", query.lower())
 		self.assertEqual(params, ("ROW-0001", "ROW-0002"))
 		self.assertEqual(sql.call_args.kwargs, {"as_dict": True})
+
+	def test_source_lock_compares_persisted_precision_and_still_rejects_drift(self):
+		for precision, preview, changed in ((6, 0.233333, 0.233334), (4, 0.2333, 0.2334)):
+			item = FakeDocument(
+				project="PROJ-0001",
+				source_count=2,
+				raw_billable_hours=preview,
+				source_details_json='[{"timesheet_detail":"ROW-0001"},{"timesheet_detail":"ROW-0002"}]',
+				timesheet_detail=None,
+			)
+			rows = [
+				_locked_source("ROW-0001", billing_hours=0.116666667),
+				_locked_source("ROW-0002", billing_hours=0.116666667),
+			]
+			with (
+				self.subTest(precision=precision),
+				patch("working_time.platform_operations.frappe.db.sql", return_value=rows),
+				patch("working_time.platform_operations.frappe.get_precision", return_value=precision),
+			):
+				self.assertEqual(len(_lock_billing_sources(_review_source_items([item]))), 2)
+				item.raw_billable_hours = changed
+				with self.assertRaisesRegex(FrappeValidationError, "Billing hours changed"):
+					_lock_billing_sources(_review_source_items([item]))
 
 	def test_source_lock_rejects_native_invoice_reference(self):
 		item = FakeDocument(

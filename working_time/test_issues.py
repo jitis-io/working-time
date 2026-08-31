@@ -70,6 +70,8 @@ class TestIssueBooking(unittest.TestCase):
 			project_name="Customer project",
 			customer="CUST-0001",
 			project_type="External",
+			status="Open",
+			is_active="Yes",
 			time_billable=1,
 		)
 		with (
@@ -106,6 +108,8 @@ class TestIssueBooking(unittest.TestCase):
 			name="PROJ-0001",
 			customer=None,
 			project_type="Internal",
+			status="Open",
+			is_active="Yes",
 			time_billable=0,
 		)
 		with (
@@ -156,5 +160,6 @@ class TestIssueBooking(unittest.TestCase):
 			customer_description=None,
 			internal_note=None,
 			billable=0,
+			booking_request_id=None,
 		)
 		self.assertEqual(result["working_time"], "WT-0001")

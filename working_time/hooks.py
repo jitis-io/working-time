@@ -130,6 +130,9 @@ doc_events = {
 	"Task": {
 		"validate": "working_time.customer_projects.assign_issue_project_to_task",
 	},
+	"Timesheet": {
+		"before_cancel": "working_time.platform_operations.assert_timesheet_unclaimed",
+	},
 }
 
 # Scheduled Tasks

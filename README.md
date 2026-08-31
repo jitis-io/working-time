@@ -59,6 +59,31 @@ drill-down lists.
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
 
+## Upgrade to 1.8.3
+
+- Reopening **Daily close** returns the existing active day, including an already submitted day.
+  Adding more time after submission is rejected; correct the day through reviewed Cancel/Amend.
+- The booking dialog sends a stable `booking_request_id` UUID. Retrying the same request after a lost
+  response returns the original Working Time instead of adding another row. A changed payload with
+  the same key is rejected. API callers may opt into the same backward-compatible parameter.
+- Booking requests are serialized per Employee, including the first daily draft creation. Independent
+  bookings from two tabs are retained after successful requests, while an identical retry is applied
+  once. MariaDB snapshot isolation can abort an overlapping request; retry in the same dialog with
+  the same UUID. There is no automatic server rollback/retry of a caller's surrounding transaction.
+- Issue and Task entry points enforce the same open-Project requirement as direct Project booking.
+- Direct Working Time rows enforce the same Project and Task read permissions as the booking API.
+- A permanent customer account cannot be reassigned to a different Customer or made customerless.
+  Other Projects also keep their customer once work or billing records reference them.
+- Referenced billing sources also block native Timesheet cancellation and Desk's linked-document
+  cancellation path, before it can bypass the parent Working Time guard.
+- The billing-source change guard compares hours at the Billing Review field's persisted precision,
+  using Frappe's rounding policy. Native fractional-minute hours no longer produce a false drift
+  error, while changes at the stored precision still block draft creation or submission.
+
+Migration only adds two hidden, non-copyable booking metadata fields to Working Time Log. It does not
+change historical time, billing rates or billing eligibility. A newly opened dialog is a new booking;
+after reloading the page, inspect the daily draft before re-entering work with an uncertain outcome.
+
 ## Upgrade to 1.8.2
 
 Version 1.8.2 makes the duration-first workflow more direct without changing any billing or

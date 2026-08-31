@@ -1,3 +1,6 @@
+import hashlib
+import json
+import uuid
 from datetime import datetime, timedelta
 
 import frappe
@@ -79,12 +82,24 @@ def get_or_create_daily_working_time(employee: str, date: str):
 
 	employee = require_employee_access(employee)
 	date = getdate(date)
-	name = frappe.db.get_value("Working Time", {"employee": employee, "date": date, "docstatus": 0}, "name")
+	# Serialise both first creation and appends, including requests from two tabs.
+	frappe.db.sql("select name from `tabEmployee` where name=%s for update", (employee,))
+	name = frappe.db.get_value(
+		"Working Time",
+		{"employee": employee, "date": date, "docstatus": ("!=", 2)},
+		"name",
+		for_update=True,
+	)
 	if name:
-		return frappe.get_doc("Working Time", name).as_dict()
+		return frappe.get_doc("Working Time", name, for_update=True).as_dict()
 	doc = frappe.get_doc({"doctype": "Working Time", "employee": employee, "date": date})
 	doc.insert()
 	return doc.as_dict()
+
+
+def _validate_open_project(project_doc):
+	if project_doc.status in {"Completed", "Cancelled"} or project_doc.is_active == "No":
+		frappe.throw(_("Time can only be booked to an open project."))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -107,6 +122,7 @@ def get_issue_time_context(issue: str, date: str):
 	project_doc = frappe.get_doc("Project", project)
 	if not frappe.has_permission("Project", "read", doc=project_doc):
 		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
+	_validate_open_project(project_doc)
 	validate_issue_booking(issue_doc.name, project)
 	try:
 		tasks = frappe.get_list(
@@ -141,8 +157,7 @@ def get_project_time_context(project: str, date: str):
 	project_doc = frappe.get_doc("Project", project)
 	if not frappe.has_permission("Project", "read", doc=project_doc):
 		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
-	if project_doc.status in {"Completed", "Cancelled"} or project_doc.is_active == "No":
-		frappe.throw(_("Time can only be booked to an open project."))
+	_validate_open_project(project_doc)
 	return {
 		"employee": employee,
 		"date": str(getdate(date)),
@@ -204,6 +219,7 @@ def get_task_time_context(task: str, date: str):
 	project_doc = frappe.get_doc("Project", task_doc.project)
 	if not frappe.has_permission("Project", "read", doc=project_doc):
 		frappe.throw(_("You are not permitted to read this project."), frappe.PermissionError)
+	_validate_open_project(project_doc)
 	if task_doc.issue:
 		validate_issue_booking(task_doc.issue, task_doc.project, task_doc.name)
 	return {
@@ -230,12 +246,53 @@ def _append_time_log(
 	customer_description: str | None,
 	internal_note: str | None,
 	billable: int | str,
+	booking_request_id: str | None = None,
 ) -> dict[str, str]:
 	duration_minutes = cint(duration_minutes)
 	if duration_minutes <= 0:
 		frappe.throw(_("Duration must be greater than zero."))
 	working_time = get_or_create_daily_working_time(employee, date)
-	doc = frappe.get_doc("Working Time", working_time.name)
+	doc = frappe.get_doc("Working Time", working_time.name, for_update=True)
+	request_hash = None
+	if booking_request_id:
+		try:
+			booking_request_id = str(uuid.UUID(str(booking_request_id)))
+		except (ValueError, TypeError, AttributeError):
+			frappe.throw(_("Invalid booking request identifier."))
+		request_hash = hashlib.sha256(
+			json.dumps(
+				[
+					str(getdate(date)),
+					duration_minutes,
+					project,
+					task,
+					issue,
+					start_time,
+					customer_description or "",
+					internal_note or "",
+					cint(billable),
+				],
+				ensure_ascii=False,
+			).encode()
+		).hexdigest()
+		previous = frappe.db.sql(
+			"""select log.parent, log.booking_request_hash, wt.docstatus
+			from `tabWorking Time Log` log
+			join `tabWorking Time` wt on wt.name=log.parent
+			where wt.employee=%s and log.booking_request_id=%s
+			for update""",
+			(employee, booking_request_id),
+			as_dict=True,
+		)
+		if previous:
+			row = previous[0]
+			if row.docstatus == 2 or row.booking_request_hash != request_hash:
+				frappe.throw(
+					_("This booking request was already saved. Check the daily close before booking again.")
+				)
+			return {"working_time": row.parent, "route": f"/app/working-time/{row.parent}"}
+	if doc.docstatus != 0:
+		frappe.throw(_("This day is already submitted. Cancel and amend it before adding time."))
 	from_time = to_time = None
 	if start_time:
 		try:
@@ -257,6 +314,8 @@ def _append_time_log(
 			"customer_description": customer_description,
 			"internal_note": internal_note,
 			"billable": "100%" if cint(billable) else "0%",
+			"booking_request_id": booking_request_id,
+			"booking_request_hash": request_hash,
 		},
 	)
 	doc.save()
@@ -274,6 +333,7 @@ def book_time(
 	customer_description: str | None = None,
 	internal_note: str | None = None,
 	billable: int | str = 0,
+	booking_request_id: str | None = None,
 ):
 	context = get_time_booking_context(date=date, project=project, issue=issue, task=task)
 	resolved_issue = context.get("issue")
@@ -298,6 +358,7 @@ def book_time(
 		customer_description=customer_description,
 		internal_note=internal_note,
 		billable=billable,
+		booking_request_id=booking_request_id,
 	)
 
 
@@ -312,6 +373,7 @@ def add_issue_time(
 	customer_description: str | None = None,
 	internal_note: str | None = None,
 	billable: int | str = 1,
+	booking_request_id: str | None = None,
 ):
 	employee, issue_doc = _require_booking_access(issue)
 	context = get_issue_time_context(issue_doc.name, date)
@@ -329,6 +391,7 @@ def add_issue_time(
 		customer_description=customer_description,
 		internal_note=internal_note,
 		billable=billable,
+		booking_request_id=booking_request_id,
 	)
 
 
@@ -341,6 +404,7 @@ def add_task_time(
 	customer_description: str | None = None,
 	internal_note: str | None = None,
 	billable: int | str = 0,
+	booking_request_id: str | None = None,
 ):
 	employee, task_doc = _require_task_booking_access(task)
 	context = get_task_time_context(task_doc.name, date)
@@ -355,4 +419,5 @@ def add_task_time(
 		customer_description=customer_description,
 		internal_note=internal_note,
 		billable=billable,
+		booking_request_id=booking_request_id,
 	)
