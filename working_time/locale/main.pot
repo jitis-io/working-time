@@ -1146,3 +1146,6 @@ msgstr ""
 
 msgid "A concurrent booking interrupted this request. Keep this dialog open and book again with the same values."
 msgstr ""
+
+msgid "A concurrent request interrupted opening the daily close. Please try again."
+msgstr ""

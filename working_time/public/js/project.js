@@ -284,8 +284,18 @@
 
 	async function open_daily_record() {
 		const result =
-			(await frappe.xcall("working_time.issues.get_or_create_my_working_time", {
-				date: frappe.datetime.get_today(),
+			(await new Promise((resolve, reject) => {
+				frappe.xcall("working_time.issues.get_or_create_my_working_time", {
+					date: frappe.datetime.get_today(),
+				}, "POST", {
+					error_handlers: {
+						// Frappe's native handler can leave xcall pending. Reject this
+						// action so run_locked releases the button for an explicit retry.
+						QueryDeadlockError: () => reject(new Error(__(
+							"A concurrent request interrupted opening the daily close. Please try again."
+						))),
+					},
+				}).then(resolve, reject);
 			})) || {};
 		const name = result.working_time || result.name;
 		if (name) {

@@ -1157,3 +1157,6 @@ msgstr "Der Kunde kann nicht geändert werden, sobald Arbeits- oder Abrechnungsb
 
 msgid "A concurrent booking interrupted this request. Keep this dialog open and book again with the same values."
 msgstr "Eine gleichzeitige Buchung hat diesen Vorgang unterbrochen. Lass diesen Dialog geöffnet und buche mit denselben Angaben erneut."
+
+msgid "A concurrent request interrupted opening the daily close. Please try again."
+msgstr "Ein gleichzeitiger Vorgang hat das Öffnen des Tagesabschlusses unterbrochen. Bitte versuche es erneut."

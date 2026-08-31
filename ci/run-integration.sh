@@ -9,7 +9,7 @@ readonly DB_HOST="${DB_HOST:-mariadb}"
 readonly DB_ROOT_USERNAME="${DB_ROOT_USERNAME:-root}"
 readonly DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-root}"
 readonly SITE_NAME="${SITE_NAME:-test_site}"
-readonly FRAPPE_COMMIT="6a329d068416768ec47ccd3326b9cc95a8d7bf99"
+readonly FRAPPE_COMMIT="5cba016e86b54b57f34a3864282b92300ef20fb0"
 readonly ERPNEXT_COMMIT="11e0ba0a1c45f217e2e73e885f699102d06da325"
 readonly HRMS_COMMIT="f281e8b172ac8836ad89c59df65a922101103097"
 
@@ -35,7 +35,7 @@ git -C "$APP_SOURCE_DIR" -c user.name='Disposable CI' -c user.email='ci@example.
 # Keep Bench's own Git operations outside the source checkout.
 cd /home/runner
 bench init \
-	--frappe-branch v16.31.0 \
+	--frappe-branch v16.32.0 \
 	--python "$(command -v python)" \
 	--skip-assets \
 	--skip-redis-config-generation \
