@@ -17,6 +17,26 @@ class InvoiceProjectClientScriptTest(TestCase):
 		self.assertNotIn("update_docfield_property", script)
 
 
+class BillingReviewListClientScriptTest(TestCase):
+	def test_monthly_review_uses_the_preview_api_for_all_projects(self):
+		hooks = (APP_ROOT / "hooks.py").read_text(encoding="utf-8")
+		script = (APP_ROOT / "public" / "js" / "billing_review_list.js").read_text(encoding="utf-8")
+
+		self.assertIn('"Billing Review": "public/js/billing_review_list.js"', hooks)
+		self.assertIn('__("Prepare month")', script)
+		self.assertIn('frappe.user.has_role("System Manager")', script)
+		self.assertIn("frappe.datetime.month_start(today)", script)
+		self.assertIn("frappe.datetime.month_end(today)", script)
+		self.assertIn("working_time.platform_operations.create_billing_review", script)
+		self.assertNotIn("create_billing_invoice_drafts", script)
+		self.assertNotIn("project:", script.lower())
+		for filename in ("de.po", "en.po", "main.pot"):
+			catalog = (APP_ROOT / "locale" / filename).read_text(encoding="utf-8")
+			self.assertIn('msgid "Prepare month"', catalog)
+		german = (APP_ROOT / "locale" / "de.po").read_text(encoding="utf-8")
+		self.assertIn('msgstr "Monat vorbereiten"', german)
+
+
 class TimeBookingClientScriptTest(TestCase):
 	def test_booking_and_navigation_runtime_semantics(self):
 		node = shutil.which("node")

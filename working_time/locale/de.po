@@ -5,7 +5,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Working Time 1.8.2\n"
+"Project-Id-Version: Working Time 1.8.4\n"
 "Report-Msgid-Bugs-To: info@jitis.io\n"
 "POT-Creation-Date: 2026-08-21 00:00+0000\n"
 "PO-Revision-Date: 2026-08-21 00:00+0000\n"
@@ -893,6 +893,10 @@ msgstr "Das Projekt konnte nicht übernommen werden."
 #: working_time/public/js/billing_review_list.js:4
 msgid "Create monthly review"
 msgstr "Monatliche Abrechnungsprüfung erstellen"
+
+#: working_time/public/js/billing_review_list.js:3
+msgid "Prepare month"
+msgstr "Monat vorbereiten"
 
 #: working_time/public/js/billing_review_list.js:10
 msgid "Create billing review"

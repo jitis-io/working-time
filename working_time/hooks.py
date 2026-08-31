@@ -39,7 +39,7 @@ doctype_js = {
 	"Task": "public/js/task.js",
 }
 
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {"Billing Review": "public/js/billing_review_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -342,19 +342,20 @@ working_time_custom_fields = {
 			"insert_after": "task",
 			"read_only": 1,
 		},
+		# Native Timesheet is primary; keep customer and internal text editable in drafts.
 		{
 			"fieldname": "customer_description",
 			"label": "Customer Description",
 			"fieldtype": "Small Text",
 			"insert_after": "description",
-			"read_only": 1,
+			"read_only": 0,
 		},
 		{
 			"fieldname": "internal_note",
 			"label": "Internal Note",
 			"fieldtype": "Small Text",
 			"insert_after": "customer_description",
-			"read_only": 1,
+			"read_only": 0,
 		},
 	],
 	"Sales Invoice Timesheet": [

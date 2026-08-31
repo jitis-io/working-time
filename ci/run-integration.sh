@@ -10,8 +10,8 @@ readonly DB_ROOT_USERNAME="${DB_ROOT_USERNAME:-root}"
 readonly DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-root}"
 readonly SITE_NAME="${SITE_NAME:-test_site}"
 readonly FRAPPE_COMMIT="5cba016e86b54b57f34a3864282b92300ef20fb0"
-readonly ERPNEXT_COMMIT="11e0ba0a1c45f217e2e73e885f699102d06da325"
-readonly HRMS_COMMIT="f281e8b172ac8836ad89c59df65a922101103097"
+readonly ERPNEXT_COMMIT="b24c9eba551905e256e336ff170a91a92d197a2f"
+readonly HRMS_COMMIT="519a078131f7f96f8313b405caa511a1229a98f9"
 
 until mariadb-admin ping --host="$DB_HOST" --user=root --password="$DB_ROOT_PASSWORD" --silent; do
 	sleep 2
@@ -44,9 +44,9 @@ bench init \
 cd "$BENCH_DIR"
 test "$(git -C apps/frappe rev-parse HEAD)" = "$FRAPPE_COMMIT"
 
-bench get-app --skip-assets --branch v16.32.3 erpnext https://github.com/frappe/erpnext.git
+bench get-app --skip-assets --branch v16.33.0 erpnext https://github.com/frappe/erpnext.git
 test "$(git -C apps/erpnext rev-parse HEAD)" = "$ERPNEXT_COMMIT"
-bench get-app --skip-assets --branch v16.16.0 hrms https://github.com/frappe/hrms.git
+bench get-app --skip-assets --branch v16.17.0 hrms https://github.com/frappe/hrms.git
 test "$(git -C apps/hrms rev-parse HEAD)" = "$HRMS_COMMIT"
 bench get-app --skip-assets --soft-link "$APP_SOURCE_DIR"
 bench setup requirements --dev
