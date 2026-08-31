@@ -65,3 +65,8 @@ class TestInstall(TestCase):
 		self.assertIsNotNone(snapshot_field)
 		self.assertEqual(snapshot_field.fieldtype, "Check")
 		self.assertTrue(snapshot_field.read_only)
+		for fieldname in ("customer_description", "internal_note"):
+			field = frappe.get_meta("Timesheet Detail").get_field(fieldname)
+			self.assertIsNotNone(field)
+			self.assertEqual(field.fieldtype, "Small Text")
+			self.assertFalse(field.read_only)

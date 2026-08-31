@@ -361,6 +361,72 @@ class TestDailyWorkflow(IntegrationTestCase):
 		self.assertEqual(frappe.db.count("Attendance", {"working_time": amended.name, "docstatus": 1}), 1)
 		self.assertEqual(frappe.db.get_value("Working Time", doc.name, "docstatus"), 2)
 
+	def test_native_multi_customer_timesheet_creates_invoice_drafts_without_submitting(self):
+		item = frappe.get_doc(
+			{
+				"doctype": "Item",
+				"item_code": f"_Test WT Native Hour {self.suffix}",
+				"item_group": "All Item Groups",
+				"stock_uom": "Hour",
+				"is_stock_item": 0,
+			}
+		).insert()
+		frappe.db.set_single_value("Working Time Settings", "default_time_billing_item", item.name)
+		timesheet = frappe.get_doc(
+			{
+				"doctype": "Timesheet",
+				"company": self.company.name,
+				"employee": self.employee.name,
+				"time_logs": [
+					{
+						"activity_type": "Default",
+						"from_time": f"{self.day} 18:00:00",
+						"to_time": f"{self.day} 18:12:00",
+						"project": self.projects[0].name,
+						"is_billable": 1,
+						"customer_description": "Native customer service A",
+						"internal_note": "Private native note A",
+					},
+					{
+						"activity_type": "Default",
+						"from_time": f"{self.day} 18:30:00",
+						"to_time": f"{self.day} 18:48:00",
+						"project": self.projects[1].name,
+						"is_billable": 1,
+						"customer_description": "Native customer service B",
+						"internal_note": "Private native note B",
+					},
+				],
+			}
+		).insert()
+		self.assertFalse(timesheet.get("customer"))
+		self.assertFalse(timesheet.get("parent_project"))
+		self.assertFalse(timesheet.get("working_time"))
+		timesheet.submit()
+
+		preview = create_billing_review(self.day, self.day)
+		self.assertEqual(preview["eligible_group_count"], 2)
+		review = frappe.get_doc("Billing Review", preview["name"])
+		self.assertFalse(review.project)
+		self.assertEqual(review.status, "Preview")
+		rows = {row.customer: row for row in review.items if row.status == "Eligible"}
+		self.assertEqual(set(rows), {customer.name for customer in self.customers})
+		self.assertEqual(frappe.utils.flt(rows[self.customers[0].name].hours, 2), 0.25)
+		self.assertEqual(frappe.utils.flt(rows[self.customers[1].name].hours, 2), 0.5)
+
+		drafted = create_billing_invoice_drafts(review.name)
+		self.assertTrue(drafted["created"])
+		self.assertEqual(len(drafted["sales_invoices"]), 2)
+		invoices = [frappe.get_doc("Sales Invoice", name) for name in drafted["sales_invoices"]]
+		self.assertEqual({invoice.customer for invoice in invoices}, {c.name for c in self.customers})
+		self.assertTrue(all(invoice.docstatus == 0 for invoice in invoices))
+		self.assertTrue(all(len(invoice.timesheets) == 1 for invoice in invoices))
+		descriptions = "\n".join(row.description for invoice in invoices for row in invoice.items)
+		self.assertIn("Native customer service A", descriptions)
+		self.assertIn("Native customer service B", descriptions)
+		self.assertNotIn("Private native note", descriptions)
+		self.assertEqual(frappe.db.get_value("Billing Review", review.name, "status"), "Draft Created")
+
 	def test_billing_draft_rounds_after_aggregation_and_repeat_does_not_duplicate(self):
 		from frappe.desk.form.linked_with import cancel_all_linked_docs, get_submitted_linked_docs
 

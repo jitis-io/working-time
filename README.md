@@ -9,26 +9,29 @@ customer account and the single entry point for tickets, tasks, time, purchases 
 ## Operating model
 
 ```text
-Customer -> permanent customer Project -> Issue or Task -> time booking
+Customer -> permanent customer Project -> Issue or Task -> ERPNext Timesheet
                                       -> Purchase Invoice costs
-                                      -> monthly Project overview
+                                      -> monthly Billing Review
                                       -> reviewed Sales Invoice draft
 ```
 
 - Every active Customer has one permanent customer Project. Its visible project name is the ERPNext
   customer number. Historical job Projects remain untouched and are not merged automatically.
 - An Issue is incoming work. A Task is only needed for planned or multi-step work.
-- **Book time** on Project, Issue or Task adds a duration-first row to the current employee's daily
-  Working Time draft.
-- **Day close** opens that one daily Working Time record. Start, end, break and the complete allocation
-  are checked once before submit.
-- Submitting Working Time creates Attendance and one ERPNext Timesheet per employee, day and Project.
-  Do not create Timesheets manually.
+- ERPNext **Timesheet** is the primary time-entry record. Create one daily draft per employee and add
+  one row for each customer Project. When a day spans multiple customers, leave the Timesheet header's
+  Customer and Project empty and assign the Project on every time row.
+- **Customer Description** on a Timesheet row is reviewed customer-facing text that can be copied to a
+  later invoice draft. **Internal Note** stays internal and is never copied to customer output.
+- **Book time** and **Day close** remain an optional compatibility path for the legacy Working Time
+  workflow. Submitting a Working Time record creates native Timesheets and Attendance. Do not mix both
+  entry paths for the same work, employee and day.
 - Purchase Invoice rows carry the customer Project. ERPNext and the Project month view then show the
   net cost in company currency.
-- **Create time invoice draft** uses the visible monthly preview and opens exactly one draft Sales
-  Invoice for eligible time. It never submits or sends anything. A separate **Sales invoice** action
-  covers recurring fees and manually reviewed pass-through costs.
+- In the **Billing Review** list, **Prepare month** collects all eligible submitted Timesheet rows for
+  the selected period and all customer Projects. Review that preview before creating Sales Invoice
+  drafts. Neither action submits or sends an invoice. Project-level invoice actions remain available
+  for a deliberately narrower review.
 - Purchase costs are visible in the month view but are not copied into a customer invoice automatically;
   sales item, markup and tax treatment require an explicit commercial decision.
 
@@ -58,6 +61,15 @@ drill-down lists.
 
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
+
+## Upgrade to 1.8.4
+
+- Native ERPNext Timesheet drafts now expose editable **Customer Description** and **Internal Note**
+  fields on every time row.
+- The Billing Review list provides **Prepare month**. It creates one review across every eligible
+  customer Project for the selected period; invoice drafts still require a separate reviewed action.
+- ERPNext Timesheet is now the documented primary entry path. Working Time remains available as an
+  optional compatibility workflow and is not a second billing source.
 
 ## Upgrade to 1.8.3
 
