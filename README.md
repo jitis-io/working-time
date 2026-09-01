@@ -9,23 +9,26 @@ customer account and the single entry point for tickets, tasks, time, purchases 
 ## Operating model
 
 ```text
-Customer -> permanent customer Project -> Issue or Task -> ERPNext Timesheet
-                                      -> Purchase Invoice costs
+Customer -> permanent customer Project -> Issue or Task -> Working Time
+                                      -> day close -> native ERPNext Timesheets
                                       -> monthly Billing Review
-                                      -> reviewed Sales Invoice draft
+                                      -> reviewed Sales Invoice drafts
+Customer Project --------------------> Purchase Invoice costs
 ```
 
 - Every active Customer has one permanent customer Project. Its visible project name is the ERPNext
   customer number. Historical job Projects remain untouched and are not merged automatically.
 - An Issue is incoming work. A Task is only needed for planned or multi-step work.
-- ERPNext **Timesheet** is the primary time-entry record. Create one daily draft per employee and add
-  one row for each customer Project. When a day spans multiple customers, leave the Timesheet header's
-  Customer and Project empty and assign the Project on every time row.
-- **Customer Description** on a Timesheet row is reviewed customer-facing text that can be copied to a
-  later invoice draft. **Internal Note** stays internal and is never copied to customer output.
-- **Book time** and **Day close** remain an optional compatibility path for the legacy Working Time
-  workflow. Submitting a Working Time record creates native Timesheets and Attendance. Do not mix both
-  entry paths for the same work, employee and day.
+- **Book time** is the single quick primary capture path. Start it from Project, Issue or Task; all
+  successful bookings for an employee and date are retained on that day's Working Time record.
+- **Day close** submits the reviewed day and creates native ERPNext Timesheets plus Attendance when
+  configured. Submitted Timesheet Details remain the technical source for Billing Review and invoice
+  evidence.
+- Do not maintain direct manual Timesheets in parallel for the same work, employee and day. Native
+  Timesheet editing remains available for deliberate correction or compatibility cases, not as a second
+  everyday capture workflow.
+- **Customer Description** is reviewed customer-facing text carried into the native Timesheet and later
+  invoice draft. **Internal Note** stays internal and is never copied to customer output.
 - Purchase Invoice rows carry the customer Project. ERPNext and the Project month view then show the
   net cost in company currency.
 - In the **Billing Review** list, **Prepare month** collects all eligible submitted Timesheet rows for
@@ -64,12 +67,13 @@ Purchase Invoices or Sales Invoices do not receive those details from the Projec
 
 ## Upgrade to 1.8.4
 
-- Native ERPNext Timesheet drafts now expose editable **Customer Description** and **Internal Note**
-  fields on every time row.
+- Native ERPNext Timesheet drafts expose editable **Customer Description** and **Internal Note** fields
+  on every time row for deliberate correction and compatibility cases.
 - The Billing Review list provides **Prepare month**. It creates one review across every eligible
   customer Project for the selected period; invoice drafts still require a separate reviewed action.
-- ERPNext Timesheet is now the documented primary entry path. Working Time remains available as an
-  optional compatibility workflow and is not a second billing source.
+- Working Time is the documented single quick primary capture path. Day close creates the native
+  Timesheet records used by ERPNext and Billing Review; direct manual Timesheets are not a parallel
+  everyday entry path.
 
 ## Upgrade to 1.8.3
 
