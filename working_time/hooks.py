@@ -342,7 +342,8 @@ working_time_custom_fields = {
 			"insert_after": "task",
 			"read_only": 1,
 		},
-		# Native Timesheet is primary; keep customer and internal text editable in drafts.
+		# Working Time is the primary quick capture path. Native Timesheet Details then
+		# become authoritative billing records and stay editable while in draft.
 		{
 			"fieldname": "customer_description",
 			"label": "Customer Description",

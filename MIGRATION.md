@@ -1,5 +1,19 @@
 # Migration and acceptance checklist
 
+## 1.8.4 one primary Working Time path
+
+- Run the normal site migration and confirm Working Time, native Timesheet and Billing Review metadata
+  are present without changing historical time or invoice links.
+- Book one day from Project, Issue and Task. Confirm every successful action appends exactly one intended
+  row to the same employee/day Working Time record and retains Project, Issue/Task and both descriptions.
+- Complete day close once and confirm it creates the expected native Timesheet rows and Attendance.
+- Verify **Customer Description** reaches the native Timesheet and reviewed invoice evidence while
+  **Internal Note** remains internal.
+- Do not create a parallel direct Timesheet for the same work during acceptance. Use native editing only
+  as a deliberate correction/compatibility test and verify Billing Review still sees one intended source.
+- Use **Prepare month** across at least two eligible customer Projects. Review the preview, create separate
+  Sales Invoice drafts, and confirm neither draft is submitted, emailed or sent automatically.
+
 ## 1.8.1 customer-safe invoice evidence
 
 - Run the normal site migration and confirm `Sales Invoice Timesheet.working_time_customer_snapshot` exists.
