@@ -20,7 +20,7 @@ services:
         condition: service_healthy
 
   mariadb:
-    image: mariadb:11.8
+    image: mariadb:12.3
     environment:
       MARIADB_ROOT_PASSWORD: root
     command:
