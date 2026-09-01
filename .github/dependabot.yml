@@ -1,0 +1,38 @@
+version: 2
+
+multi-ecosystem-groups:
+  weekly-dependencies:
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    patterns:
+      - "*"
+    ignore:
+      - dependency-name: "frappe"
+      - dependency-name: "erpnext"
+      - dependency-name: "hrms"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/ci"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "docker-compose"
+    directory: "/ci"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
