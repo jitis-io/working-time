@@ -1164,3 +1164,33 @@ msgstr "Eine gleichzeitige Buchung hat diesen Vorgang unterbrochen. Lass diesen 
 
 msgid "A concurrent request interrupted opening the daily close. Please try again."
 msgstr "Ein gleichzeitiger Vorgang hat das Öffnen des Tagesabschlusses unterbrochen. Bitte versuche es erneut."
+
+msgid "Active work"
+msgstr "Aktive Arbeit"
+
+msgid "Assigned to me"
+msgstr "Mir zugewiesen"
+
+msgid "Due today"
+msgstr "Heute fällig"
+
+msgid "Due this week"
+msgstr "Diese Woche fällig"
+
+msgid "Work view"
+msgstr "Arbeitsansicht"
+
+msgid "Missing Rate"
+msgstr "Stundensatz fehlt"
+
+msgid "Hourly rate frozen on the submitted Timesheet in company currency. Missing rates are excluded."
+msgstr "Im eingereichten Stundenzettel gespeicherter Stundensatz in Firmenwährung. Fehlende Sätze werden ausgeschlossen."
+
+msgid "Time billing drafts require the Sales Order to use the company currency."
+msgstr "Für Zeitabrechnungsentwürfe muss der Kundenauftrag die Firmenwährung verwenden."
+
+msgid "Review the signed Contract and Subscription before creating drafts: included Care time, minimum time per case and additional services require a deliberate billing decision. Rates come from the submitted Timesheet in company currency; missing rates are excluded."
+msgstr "Vor Rechnungsentwürfen den unterschriebenen Vertrag und das Abonnement prüfen: enthaltene Care-Zeit, Mindestzeit je Vorgang und Mehrleistungen bewusst abrechnen. Es gelten die im eingereichten Stundenzettel gespeicherten Sätze in Firmenwährung; fehlende Sätze werden ausgeschlossen."
+
+msgid "Close the whole workday: enter start, end and break, and allocate all net time. Book administration and acquisition to your internal Project. Review customer descriptions and mark included Care time as non-billable. Submission creates native Timesheets and Attendance; it does not invoice or send anything."
+msgstr "Den ganzen Arbeitstag abschließen: Beginn, Ende und Pause eintragen und die gesamte Nettozeit zuordnen. Verwaltung und Akquise auf das interne Projekt buchen. Kundentexte prüfen und enthaltene Care-Zeit als nicht abrechenbar markieren. Einreichen erzeugt Stundenzettel und Anwesenheit; es wird nichts in Rechnung gestellt oder versendet."

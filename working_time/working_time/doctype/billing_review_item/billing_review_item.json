@@ -127,6 +127,7 @@
    "fieldname": "rate",
    "fieldtype": "Currency",
    "label": "Rate",
+   "description": "Hourly rate frozen on the submitted Timesheet in company currency. Missing rates are excluded.",
    "read_only": 1
   },
   {
@@ -140,7 +141,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Eligible\nMissing Project\nMissing Customer\nMissing Sales Order\nLocked\nAlready Drafted\nAlready Invoiced\nDraft Created\nInvoiced",
+   "options": "Eligible\nMissing Project\nMissing Customer\nMissing Sales Order\nMissing Rate\nLocked\nAlready Drafted\nAlready Invoiced\nDraft Created\nInvoiced",
    "read_only": 1
   },
   {

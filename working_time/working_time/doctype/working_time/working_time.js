@@ -7,6 +7,9 @@ frappe.ui.form.on("Working Time", {
 	},
 	refresh: function (frm) {
 		if (frm.doc.docstatus === 0) {
+			frm.set_intro(__(
+				"Close the whole workday: enter start, end and break, and allocate all net time. Book administration and acquisition to your internal Project. Review customer descriptions and mark included Care time as non-billable. Submission creates native Timesheets and Attendance; it does not invoice or send anything."
+			), "blue");
 			// Linked documents will get created on submit.
 			// Hide the dashboard if the document is not yet submitted.
 			frm.dashboard.hide();

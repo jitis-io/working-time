@@ -17,6 +17,21 @@ class InvoiceProjectClientScriptTest(TestCase):
 		self.assertNotIn("update_docfield_property", script)
 
 
+class NativeWorkListClientScriptTest(TestCase):
+	def test_native_actions_and_filter_date_boundaries(self):
+		node = shutil.which("node")
+		self.assertIsNotNone(node, "Node.js is required for the work list runtime test")
+		completed = subprocess.run(
+			[node, str(APP_ROOT.parent / "ci" / "test-native-work-lists-runtime.mjs")],
+			cwd=APP_ROOT.parent,
+			capture_output=True,
+			text=True,
+			timeout=30,
+			check=False,
+		)
+		self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+
+
 class BillingReviewListClientScriptTest(TestCase):
 	def test_monthly_review_uses_the_preview_api_for_all_projects(self):
 		hooks = (APP_ROOT / "hooks.py").read_text(encoding="utf-8")
