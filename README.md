@@ -21,8 +21,8 @@ Customer Project --------------------> Purchase Invoice costs
 - An Issue is incoming work. A Task is only needed for planned or multi-step work.
 - **Book time** is the single quick primary capture path. Start it from Project, Issue or Task; all
   successful bookings for an employee and date are retained on that day's Working Time record.
-- **Day close** submits the reviewed day and creates native ERPNext Timesheets plus Attendance when
-  configured. Submitted Timesheet Details remain the technical source for Billing Review and invoice
+- **Day close** submits the reviewed day and creates native ERPNext Timesheets plus Attendance.
+  Submitted Timesheet Details remain the technical source for Billing Review and invoice
   evidence.
 - Do not maintain direct manual Timesheets in parallel for the same work, employee and day. Native
   Timesheet editing remains available for deliberate correction or compatibility cases, not as a second
@@ -61,9 +61,40 @@ drill-down lists.
 3. Configure the hourly billing Item in **Working Time Settings**.
 4. On a customer Project enable **Bill Time** and enter the verified hourly rate when hours are chargeable.
 5. Maintain Activity Cost for each Employee when internal time cost is required.
+6. Select an explicitly internal Project for administration and acquisition. Day close requires start,
+   end, break and allocation of the complete net workday, including your own non-customer work.
+7. Keep **Create Daily Drafts** disabled unless empty daily reminders are deliberately wanted. The
+   default is disabled; migration does not override an existing operator choice or delete old drafts.
 
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
+
+## Upgrade to 1.8.5
+
+- Native Task and Issue lists retain ERPNext actions and gain **Work view** shortcuts for active work,
+  assigned-to-me, due today, due this week (Monday to Sunday), and overdue. Task dates use Expected End;
+  Issue dates use the existing SLA Resolution By. Undated work remains in Active work. Save additional
+  personal assignment/customer filters with ERPNext's normal list controls.
+- Billing Review uses the submitted Timesheet Detail's **base billing rate**, frozen in company currency.
+  Changing the current Project rate does not reprice old time. Different recorded rates stay in separate
+  groups, and missing/zero recorded rates become **Missing Rate** exceptions without a current-rate fallback.
+- Rates and exact sources are revalidated both before draft creation and before invoice submission.
+  Native Sales Order billing is supported only in company currency and still requires its rate to agree.
+- Existing rates, time records, claimed billing sources and invoices are not migrated or backfilled.
+  A preview with missing historical rates needs review. Correct unbilled source evidence through the
+  native correction flow after removing an unused preview; never alter a submitted/billed history blindly.
+
+### Care month review with native records
+
+Use the agreed, signed **Contract** and existing **Subscription** as commercial evidence. The time app
+does not introduce another tariff or allowance model and does not guess a Care agreement from a Customer.
+Before closing a day, review the month's included remote time and mark that actual time **non-billable**.
+If one intervention crosses the allowance, split its real duration into included and additional rows.
+At month-end verify minimum time per case, service type, travel and the agreed additional rate against
+the Contract before submitting the generated draft. Describe any agreed minimum-time adjustment on the
+native Sales Invoice item; retain the original Timesheet references and actual duration. The generic
+15-minute aggregation alone is not a complete Care tariff calculation. The recurring fee remains in the
+native Subscription flow. Nothing here automatically submits or sends an invoice.
 
 ## Upgrade to 1.8.4
 

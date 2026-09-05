@@ -30,10 +30,10 @@ class TestBillingConcurrency(IntegrationTestCase):
 			insert into `tabTimesheet Detail`
 			(name, creation, modified, modified_by, owner, docstatus, idx,
 			parent, parentfield, parenttype, project, is_billable, billing_hours,
-			from_time, to_time, description, project_name)
+			from_time, to_time, description, project_name, base_billing_rate)
 			values (%s, now(), now(), 'Administrator', 'Administrator', 1, 1,
 			%s, 'time_logs', 'Timesheet', %s, 1, 0.2,
-			'2026-08-01 09:00:00', '2026-08-01 09:12:00', 'Concurrency test', %s)
+			'2026-08-01 09:00:00', '2026-08-01 09:12:00', 'Concurrency test', %s, 120)
 			""",
 			(source_name, f"TS-{suffix}", project, project),
 		)
@@ -89,6 +89,7 @@ class TestBillingConcurrency(IntegrationTestCase):
 							source_count=1,
 							source_details_json="",
 							raw_billable_hours=0.2,
+							rate=120,
 						)
 					}
 				)

@@ -52,6 +52,11 @@ def _project_time_billable(project: Any) -> bool:
 	return bool(int(_document_value(project, "time_billable") or 0))
 
 
+def _source_billing_rate(detail: Any) -> Decimal:
+	"""Use the submitted Timesheet's company-currency rate, never today's tariff."""
+	return _decimal(_document_value(detail, "base_billing_rate"))
+
+
 def _is_canonical_customer_project(project: Any) -> bool:
 	customer = _document_value(project, "customer")
 	if not customer:
@@ -190,8 +195,8 @@ def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, 
 		return "Missing Customer", {"project": project}
 	if not _project_time_billable(project):
 		return "Locked", {"project": project}
-	if float(project.get("billing_rate") or 0) <= 0:
-		return "Locked", {"project": project}
+	if _source_billing_rate(detail) <= 0:
+		return "Missing Rate", {"project": project}
 	is_canonical = _is_canonical_customer_project(project)
 	sales_order = None if is_canonical else project.get("sales_order")
 	if sales_order:
@@ -204,9 +209,15 @@ def _billing_status(detail: Any, claimed_sources: dict[str, str]) -> tuple[str, 
 
 def _aggregate_billing_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
 	"""Aggregate raw source entries before applying commercial rounding."""
-	groups: dict[tuple[str, str, str | None, str], dict[str, Any]] = {}
+	groups: dict[tuple[str, str, str | None, str, Decimal], dict[str, Any]] = {}
 	for source in sources:
-		key = (source["customer"], source["project"], source.get("task"), source["work_date"])
+		key = (
+			source["customer"],
+			source["project"],
+			source.get("task"),
+			source["work_date"],
+			_decimal(source.get("rate")),
+		)
 		if key not in groups:
 			groups[key] = {
 				**source,
@@ -265,7 +276,7 @@ def _billing_source(detail: Any, timesheet: Any, status: str, context: dict[str,
 		"work_date": _billing_date(detail, timesheet),
 		"actual_hours": float(detail.get("hours") or 0),
 		"raw_billable_hours": float(billing_hours or 0),
-		"rate": float((project.get("billing_rate") if project else 0) or 0),
+		"rate": float(_source_billing_rate(detail)),
 		"status": status,
 		"sales_invoice": _document_value(detail, "sales_invoice"),
 	}
@@ -440,7 +451,7 @@ def _lock_billing_sources(source_items: dict[str, Any]) -> dict[str, Any]:
 		f"""
 		select name, parent, parenttype, docstatus, project, is_billable,
 			billing_hours, sales_invoice, from_time, to_time, activity_type,
-			customer_description, description, project_name
+			customer_description, description, project_name, base_billing_rate
 		from `tabTimesheet Detail`
 		where name in ({placeholders})
 		order by name
@@ -464,6 +475,8 @@ def _lock_billing_sources(source_items: dict[str, Any]) -> dict[str, Any]:
 			or not int(_document_value(row, "is_billable") or 0)
 			or _decimal(_document_value(row, "billing_hours")) <= 0
 			or _document_value(row, "project") != _document_value(item, "project")
+			or _source_billing_rate(row) <= 0
+			or _source_billing_rate(row) != _decimal(_document_value(item, "rate"))
 		):
 			frappe.throw(
 				_("Billing source {0} changed after the preview and must be reviewed again.").format(
@@ -646,6 +659,7 @@ def validate_billing_review_invoice_sources(doc: Any, method: str | None = None)
 			"source_count",
 			"project",
 			"raw_billable_hours",
+			"rate",
 		],
 	)
 	if not review_items:
@@ -714,11 +728,7 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 				_is_canonical_customer_project(project_doc),
 			)
 		project_doc, is_canonical = project_context[item.project]
-		if (
-			project_doc.customer != item.customer
-			or not _project_time_billable(project_doc)
-			or _decimal(project_doc.get("billing_rate")) != _decimal(item.rate)
-		):
+		if project_doc.customer != item.customer or not _project_time_billable(project_doc):
 			frappe.throw(
 				_("Project time billing settings changed after the preview for {0}.").format(item.project)
 			)
@@ -735,6 +745,9 @@ def create_billing_invoice_drafts(review_name: str) -> dict[str, Any]:
 			sales_order = frappe.get_doc("Sales Order", sales_order_name)
 			for item in items:
 				_require_sales_order_for_project(sales_order, project_context[item.project][0])
+			company_currency = frappe.db.get_value("Company", sales_order.company, "default_currency")
+			if not company_currency or sales_order.currency != company_currency:
+				frappe.throw(_("Time billing drafts require the Sales Order to use the company currency."))
 			time_item_row = _sales_order_time_billing_row(sales_order, settings.default_time_billing_item)
 			so_detail = str(_document_value(time_item_row, "name"))
 			sales_order_rate = _decimal(_document_value(time_item_row, "rate"))

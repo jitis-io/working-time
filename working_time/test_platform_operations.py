@@ -92,7 +92,7 @@ class FakeDocument(types.SimpleNamespace):
 		return row
 
 
-def _locked_source(name="ROW-0001", *, project="PROJ-0001", billing_hours=0.2, sales_invoice=None):
+def _locked_source(name="ROW-0001", *, project="PROJ-0001", billing_hours=0.2, sales_invoice=None, rate=120):
 	return FakeDocument(
 		name=name,
 		parent="TS-0001",
@@ -102,6 +102,7 @@ def _locked_source(name="ROW-0001", *, project="PROJ-0001", billing_hours=0.2, s
 		project_name=project,
 		is_billable=1,
 		billing_hours=billing_hours,
+		base_billing_rate=rate,
 		sales_invoice=sales_invoice,
 		from_time="2026-08-01 09:00:00",
 		to_time="2026-08-01 09:12:00",
@@ -140,6 +141,74 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertEqual(_round_billable_hours("0.10"), 0.25)
 		self.assertEqual(_round_billable_hours("0.25"), 0.25)
 		self.assertEqual(_round_billable_hours("0.26"), 0.5)
+
+	def test_billing_uses_submitted_company_currency_rate_after_project_tariff_change(self):
+		detail = FakeDocument(
+			name="ROW-1",
+			project="PROJ-1",
+			base_billing_rate=119,
+			billing_rate=100,
+			is_billable=1,
+			billing_hours=1,
+			hours=1,
+		)
+		project = FakeDocument(name="PROJ-1", customer="CUST-1", time_billable=1, billing_rate=139)
+		with (
+			patch("working_time.platform_operations.frappe.get_doc", return_value=project),
+			patch("working_time.platform_operations.frappe.db.get_value", return_value="PROJ-1"),
+		):
+			status, context = _billing_status(detail, {})
+		self.assertEqual(status, "Eligible")
+		source = _billing_source(detail, FakeDocument(name="TS-1", start_date="2026-09-05"), status, context)
+		self.assertEqual(source["rate"], 119)
+
+	def test_missing_historical_rate_never_falls_back_to_current_project_tariff(self):
+		project = FakeDocument(name="PROJ-1", customer="CUST-1", time_billable=1, billing_rate=139)
+		for rate in (None, 0, -1):
+			detail = FakeDocument(name="ROW-1", project="PROJ-1", base_billing_rate=rate)
+			with (
+				self.subTest(rate=rate),
+				patch("working_time.platform_operations.frappe.get_doc", return_value=project),
+			):
+				status, _ = _billing_status(detail, {})
+			self.assertEqual(status, "Missing Rate")
+
+	def test_different_submitted_rates_never_share_a_rounded_billing_group(self):
+		base = {
+			"customer": "CUST-1",
+			"project": "PROJ-1",
+			"task": None,
+			"work_date": "2026-09-05",
+			"timesheet": "TS-1",
+			"actual_hours": 0.1,
+			"raw_billable_hours": 0.1,
+		}
+		groups = _aggregate_billing_sources(
+			[
+				{**base, "timesheet_detail": "ROW-1", "rate": 119},
+				{**base, "timesheet_detail": "ROW-2", "rate": 139},
+			]
+		)
+		self.assertEqual(len(groups), 2)
+		self.assertEqual(
+			sorted((g["rate"], g["hours"], g["amount"]) for g in groups),
+			[(119, 0.25, 29.75), (139, 0.25, 34.75)],
+		)
+
+	def test_source_rate_change_and_missing_snapshot_block_invoice_draft(self):
+		item = FakeDocument(
+			project="PROJ-0001", rate=119, timesheet_detail="ROW-0001", source_count=1, raw_billable_hours=0.2
+		)
+		for changed_rate in (0, 120):
+			with (
+				self.subTest(rate=changed_rate),
+				patch(
+					"working_time.platform_operations.frappe.db.sql",
+					return_value=[_locked_source(rate=changed_rate)],
+				),
+				self.assertRaisesRegex(FrappeValidationError, "changed after the preview"),
+			):
+				_lock_billing_sources(_review_source_items([item]))
 
 	def test_billing_sources_are_aggregated_before_rounding(self):
 		base = {
@@ -300,6 +369,7 @@ class TestPlatformOperations(unittest.TestCase):
 	def test_source_lock_revalidates_exact_rows_in_deterministic_order(self):
 		item = FakeDocument(
 			project="PROJ-0001",
+			rate=120,
 			source_count=2,
 			raw_billable_hours=0.4,
 			source_details_json=('[{"timesheet_detail":"ROW-0002"},{"timesheet_detail":"ROW-0001"}]'),
@@ -324,6 +394,7 @@ class TestPlatformOperations(unittest.TestCase):
 		for precision, preview, changed in ((6, 0.233333, 0.233334), (4, 0.2333, 0.2334)):
 			item = FakeDocument(
 				project="PROJ-0001",
+				rate=120,
 				source_count=2,
 				raw_billable_hours=preview,
 				source_details_json='[{"timesheet_detail":"ROW-0001"},{"timesheet_detail":"ROW-0002"}]',
@@ -346,6 +417,7 @@ class TestPlatformOperations(unittest.TestCase):
 	def test_source_lock_rejects_native_invoice_reference(self):
 		item = FakeDocument(
 			project="PROJ-0001",
+			rate=120,
 			source_count=1,
 			raw_billable_hours=0.2,
 			timesheet_detail="ROW-0001",
@@ -361,7 +433,7 @@ class TestPlatformOperations(unittest.TestCase):
 			_lock_billing_sources(_review_source_items([item]))
 
 	def test_billing_status_uses_time_billable_instead_of_legacy_billing_model(self):
-		detail = FakeDocument(name="ROW-0001", project="PROJ-0001")
+		detail = FakeDocument(name="ROW-0001", project="PROJ-0001", base_billing_rate=120)
 		project = FakeDocument(
 			name="PROJ-0001",
 			customer="CUST-0001",
@@ -388,7 +460,7 @@ class TestPlatformOperations(unittest.TestCase):
 		self.assertIs(context["project"], project)
 
 	def test_billing_review_sales_order_context_fails_closed(self):
-		detail = FakeDocument(name="ROW-0001", project="PROJ-0001")
+		detail = FakeDocument(name="ROW-0001", project="PROJ-0001", base_billing_rate=120)
 		project = FakeDocument(
 			name="PROJ-0001",
 			customer="CUST-0001",
@@ -446,6 +518,7 @@ class TestPlatformOperations(unittest.TestCase):
 	def test_project_scoped_billing_review_accepts_permanent_project_without_sales_order(self):
 		target_detail = FakeDocument(
 			name="ROW-0001",
+			base_billing_rate=120,
 			project="PROJ-0001",
 			task="TASK-0001",
 			issue="ISS-0001",
@@ -549,7 +622,7 @@ class TestPlatformOperations(unittest.TestCase):
 			company="JITIS",
 			time_billable=1,
 			billing_model="Fixed Price",
-			billing_rate=120,
+			billing_rate=999,
 			sales_order="SO-STALE",
 		)
 		invoice = FakeDocument(name="SINV-0001")
@@ -827,7 +900,9 @@ class TestPlatformOperations(unittest.TestCase):
 			patch("working_time.platform_operations.frappe.get_all", return_value=[]),
 			patch(
 				"working_time.platform_operations.frappe.db.get_value",
-				return_value="PROJ-CANONICAL",
+				side_effect=lambda doctype, *args, **kwargs: (
+					"EUR" if doctype == "Company" else "PROJ-CANONICAL"
+				),
 			),
 		):
 			result = create_billing_invoice_drafts("BR-0001")
@@ -919,7 +994,7 @@ class TestPlatformOperations(unittest.TestCase):
 				self.assertEqual(item.status, "Eligible")
 				self.assertIsNone(item.sales_invoice)
 
-	def test_invoice_creation_rejects_rate_drift_before_building_invoice(self):
+	def test_invoice_creation_rejects_sales_order_rate_or_currency_drift_before_building_invoice(self):
 		item = FakeDocument(
 			status="Eligible",
 			customer="CUST-0001",
@@ -971,25 +1046,34 @@ class TestPlatformOperations(unittest.TestCase):
 				self.fail("Sales Invoice must not be built before rate validation")
 			raise AssertionError(doctype)
 
-		with (
-			patch(
-				"working_time.platform_operations._settings",
-				return_value=FakeDocument(default_time_billing_item="TIME"),
-			),
-			patch(
-				"working_time.platform_operations._lock_billing_sources",
-				return_value={"ROW-0001": _locked_source()},
-			),
-			patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
-			patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
-			patch("working_time.platform_operations.frappe.get_all", return_value=[]),
-			patch(
-				"working_time.platform_operations.frappe.db.get_value",
-				return_value="PROJ-CANONICAL",
-			),
-			self.assertRaises(FrappeValidationError),
+		for currency, rate, message in (
+			("EUR", 119, "rates must equal the Sales Order"),
+			("USD", 120, "company currency"),
 		):
-			create_billing_invoice_drafts("BR-0001")
+			sales_order.currency = currency
+			sales_order.items[0].rate = rate
+			with (
+				self.subTest(currency=currency, rate=rate),
+				patch(
+					"working_time.platform_operations._settings",
+					return_value=FakeDocument(default_time_billing_item="TIME"),
+				),
+				patch(
+					"working_time.platform_operations._lock_billing_sources",
+					return_value={"ROW-0001": _locked_source()},
+				),
+				patch("working_time.platform_operations._claimed_billing_sources", return_value={}),
+				patch("working_time.platform_operations.frappe.get_doc", side_effect=get_doc),
+				patch("working_time.platform_operations.frappe.get_all", return_value=[]),
+				patch(
+					"working_time.platform_operations.frappe.db.get_value",
+					side_effect=lambda doctype, *args, **kwargs: (
+						"EUR" if doctype == "Company" else "PROJ-CANONICAL"
+					),
+				),
+				self.assertRaisesRegex(FrappeValidationError, message),
+			):
+				create_billing_invoice_drafts("BR-0001")
 
 		self.assertEqual(review.status, "Preview")
 		self.assertIsNone(item.sales_invoice)
@@ -1064,9 +1148,11 @@ class TestPlatformOperations(unittest.TestCase):
 					patch("working_time.platform_operations.frappe.get_all", return_value=[]),
 					patch(
 						"working_time.platform_operations.frappe.db.get_value",
-						return_value="PROJ-CANONICAL",
+						side_effect=lambda doctype, *args, **kwargs: (
+							"EUR" if doctype == "Company" else "PROJ-CANONICAL"
+						),
 					),
-					self.assertRaises(FrappeValidationError),
+					self.assertRaisesRegex(FrappeValidationError, "exactly one row"),
 				):
 					create_billing_invoice_drafts("BR-0001")
 
@@ -1257,6 +1343,7 @@ class TestPlatformOperations(unittest.TestCase):
 				"source_count",
 				"project",
 				"raw_billable_hours",
+				"rate",
 			],
 		)
 		lock_sources.assert_called_once()

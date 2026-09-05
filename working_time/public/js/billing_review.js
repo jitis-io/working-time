@@ -5,6 +5,9 @@ frappe.ui.form.on("Billing Review", {
 		}
 
 		if (frm.doc.status === "Preview") {
+			frm.set_intro(__(
+				"Review the signed Contract and Subscription before creating drafts: included Care time, minimum time per case and additional services require a deliberate billing decision. Rates come from the submitted Timesheet in company currency; missing rates are excluded."
+			), "blue");
 			frm.add_custom_button(__("Create invoice drafts"), async () => {
 				frappe.confirm(
 					__(

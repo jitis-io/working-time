@@ -1,5 +1,22 @@
 # Migration and acceptance checklist
 
+## 1.8.5 native work views and historical rate protection
+
+- Run the clean-bench migration; confirm the new Missing Rate exception is available in Billing Review.
+  No old rates, Working Times, Timesheets, Projects or invoice links are backfilled.
+- On native Task and Issue lists check Active work, Assigned to me and the three due-date shortcuts.
+  ERPNext's original bulk actions and indicators remain present; undated work stays in Active work.
+- Complete one deliberately chosen unbilled day including administration on an internal Project.
+  Review all customer text and included non-billable Care time; submit once to create Timesheets and Attendance.
+- Change a test Project's current rate after its Timesheet submission. Billing Review must retain the
+  submitted company-currency rate. A zero historical rate must remain an exception, never use today's rate.
+- Different submitted rates are grouped separately. Changing a source rate after preview must block
+  invoice creation/submission; existing invoiced and claimed sources remain unavailable for double billing.
+- Review native Contract/Subscription terms manually for Care allowance, per-case minimum and service
+  type. The generic aggregation does not promise automatic Care tariff calculation.
+- Keep Create Daily Drafts disabled for the single quick capture workflow. Existing enabled settings
+  require an explicit operator change; migration preserves them and does not delete existing empty days.
+
 ## 1.8.4 one primary Working Time path
 
 - Run the normal site migration and confirm Working Time, native Timesheet and Billing Review metadata

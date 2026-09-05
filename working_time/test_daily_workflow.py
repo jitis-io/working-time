@@ -385,6 +385,7 @@ class TestDailyWorkflow(IntegrationTestCase):
 						"project": self.projects[0].name,
 						"is_billable": 1,
 						"customer_description": "Native customer service A",
+						"billing_rate": 120,
 						"internal_note": "Private native note A",
 					},
 					{
@@ -394,6 +395,7 @@ class TestDailyWorkflow(IntegrationTestCase):
 						"project": self.projects[1].name,
 						"is_billable": 1,
 						"customer_description": "Native customer service B",
+						"billing_rate": 120,
 						"internal_note": "Private native note B",
 					},
 				],
@@ -426,6 +428,30 @@ class TestDailyWorkflow(IntegrationTestCase):
 		self.assertIn("Native customer service B", descriptions)
 		self.assertNotIn("Private native note", descriptions)
 		self.assertEqual(frappe.db.get_value("Billing Review", review.name, "status"), "Draft Created")
+
+	def test_submitted_rate_survives_project_change_and_missing_rate_is_an_exception(self):
+		from working_time.platform_operations import _lock_billing_sources, _review_source_items
+
+		doc = self.close(self.book())
+		self.projects[0].reload()
+		self.projects[0].billing_rate = 139
+		self.projects[0].save()
+		preview = create_billing_review(self.day, self.day, project=self.projects[0].name)
+		review = frappe.get_doc("Billing Review", preview["name"])
+		self.assertEqual(preview["eligible_group_count"], 1)
+		self.assertEqual(review.items[0].rate, 120)
+		source_name = review.items[0].timesheet_detail
+		self.assertEqual(frappe.db.get_value("Timesheet Detail", source_name, "base_billing_rate"), 120)
+		self.assertEqual(frappe.db.count("Timesheet", {"working_time": doc.name, "docstatus": 1}), 1)
+		frappe.db.set_value("Timesheet Detail", source_name, "base_billing_rate", 0)
+		with self.assertRaisesRegex(frappe.ValidationError, "changed after the preview"):
+			_lock_billing_sources(_review_source_items(review.items))
+		missing = create_billing_review(self.day, self.day, project=self.projects[0].name)
+		self.assertEqual(missing["eligible_group_count"], 0)
+		self.assertEqual(missing["counts"], {"Missing Rate": 1})
+		missing_review = frappe.get_doc("Billing Review", missing["name"])
+		self.assertEqual(missing_review.items[0].rate, 0)
+		self.assertEqual(missing_review.items[0].amount, 0)
 
 	def test_billing_draft_rounds_after_aggregation_and_repeat_does_not_duplicate(self):
 		from frappe.desk.form.linked_with import cancel_all_linked_docs, get_submitted_linked_docs
