@@ -21,6 +21,12 @@ from working_time.project_overview import get_project_month
 class TestDailyWorkflow(IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
+		# Frappe v16 rolls back IntegrationTestCase data only after the whole class.
+		# Each scenario owns fresh fixtures on the same date, so its transaction
+		# must end before the next scenario performs an unfiltered billing review.
+		# Register first: explicit committed-fixture cleanup must run before this.
+		self.addCleanup(frappe.db.rollback)
+		self.addCleanup(frappe.db.value_cache.clear)
 		frappe.set_user("Administrator")
 		self.suffix = uuid.uuid4().hex[:8]
 		self.day = "2026-08-17"
@@ -429,6 +435,7 @@ class TestDailyWorkflow(IntegrationTestCase):
 		review = frappe.get_doc("Billing Review", preview["name"])
 		self.assertFalse(review.project)
 		self.assertEqual(review.status, "Preview")
+		self.assertEqual({row.timesheet for row in review.items}, {timesheet.name})
 		rows = {row.customer: row for row in review.items if row.status == "Eligible"}
 		self.assertEqual(set(rows), {customer.name for customer in self.customers})
 		self.assertEqual(frappe.utils.flt(rows[self.customers[0].name].hours, 2), 0.25)
