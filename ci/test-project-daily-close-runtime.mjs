@@ -36,6 +36,7 @@ class Element {
 	children() { return this.childElements; }
 	addClass() { return this; }
 	toggleClass() { return this; }
+	find() { return this; }
 	remove() { return this; }
 	val(value) {
 		if (arguments.length === 0) return this.value;
@@ -58,12 +59,14 @@ async function settled(action) {
 	}
 }
 
-async function setup() {
+async function setup(overview = { capabilities: { can_book_time: true } }, createDelivery = false) {
 	const elements = [];
 	const calls = [];
 	const messages = [];
 	const routes = [];
 	const alerts = [];
+	const newDocuments = [];
+	const overviewCalls = [];
 	let refresh;
 	const wrapper = new Element();
 	const window = {
@@ -75,11 +78,13 @@ async function setup() {
 			assert.equal(doctype, "Project");
 			refresh = handlers.refresh;
 		} } },
-		datetime: { get_today: () => "2026-08-31" },
-		model: { can_create: () => false },
+		datetime: { get_today: () => "2026-08-31", str_to_user: (value) => value },
+		model: { can_create: (doctype) => createDelivery && doctype === "Delivery Note" },
+		new_doc: (...args) => newDocuments.push(JSON.parse(JSON.stringify(args))),
 		xcall(method, args, type, options) {
 			if (method === "working_time.project_overview.get_project_month") {
-				return Promise.resolve({ capabilities: { can_book_time: true } });
+				overviewCalls.push(JSON.parse(JSON.stringify(args)));
+				return Promise.resolve(overview);
 			}
 			assert.equal(method, "working_time.issues.get_or_create_my_working_time");
 			assert.equal(args.date, "2026-08-31");
@@ -95,6 +100,7 @@ async function setup() {
 		window,
 		frappe,
 		document: { getElementById: () => ({}) },
+		DOMParser: class { parseFromString(value) { return { body: { textContent: value } }; } },
 		$: () => { const element = new Element(); elements.push(element); return element; },
 		__: (message) => message,
 		format_currency: (value) => String(value),
@@ -108,7 +114,7 @@ async function setup() {
 	await new Promise((resolve) => setImmediate(resolve));
 	const button = elements.find((element) => element.label === "Daily close");
 	assert.ok(button?.handlers.click, "the real Project toolbar must expose Daily close");
-	return { button, calls, messages, routes, alerts, window };
+	return { button, calls, messages, routes, alerts, window, elements, newDocuments, overviewCalls };
 }
 
 function assertUnlocked(button) {
@@ -183,4 +189,58 @@ function assertUnlocked(button) {
 	assert.equal(messages[0].message, "No daily working time record is available.");
 }
 
-console.log("project.js Daily close runtime semantics: 4 scenarios passed");
+{
+	const { elements, newDocuments, routes, calls } = await setup({
+		project: { name: "TEST-PROJECT", customer: "TEST-CUSTOMER", company: "TEST-COMPANY" },
+		period: { start: "2026-08-01", end: "2026-08-31" },
+		capabilities: { can_book_time: true, can_view_deliveries: true },
+		summary: { hours: 1, pending_hours: 0.5, unbilled_amount: 120 },
+		counts: { pending_time_entries: 1, delivery_notes: 1 },
+		rows: {
+			pending_time_entries: [{ working_time: "WT-SAVED", date: "2026-08-17", hours: 0.5, description: "Saved service" }],
+			delivery_notes: [{ name: "DN-1", posting_date: "2026-08-17", status: "Partially Billed", docstatus: 1, per_billed: 50 }],
+		},
+	}, true);
+	const labelled = (label) => elements.find((element) => element.label === label);
+	assert.ok(labelled(`${(1.5).toLocaleString(undefined, { maximumFractionDigits: 2 })} h`), "recorded total includes pending duration");
+	assert.ok(labelled("120"), "pending hours do not invent a new billing amount");
+	assert.ok(labelled("Saved service"));
+	assert.ok(labelled("50%"));
+	await labelled("Record delivery").handlers.click();
+	assert.deepEqual(newDocuments, [["Delivery Note", {
+		customer: "TEST-CUSTOMER", company: "TEST-COMPANY", project: "TEST-PROJECT",
+	}]]);
+	await labelled("All delivery notes").handlers.click();
+	assert.deepEqual(JSON.parse(JSON.stringify(routes.at(-1))), ["List", "Delivery Note", {
+		project: "TEST-PROJECT", customer: "TEST-CUSTOMER",
+	}]);
+	labelled("2026-08-17").handlers.click({ preventDefault() {} });
+	assert.deepEqual(routes.at(-1), ["Form", "Working Time", "WT-SAVED"]);
+	await labelled("Open daily records").handlers.click();
+	assert.deepEqual(JSON.parse(JSON.stringify(routes.at(-1))), ["List", "Working Time", {
+		docstatus: 0, date: ["between", ["2026-08-01", "2026-08-31"]],
+	}]);
+	assert.equal(calls.length, 0, "overview navigation must not create time or submit stock");
+}
+
+{
+	const { elements } = await setup();
+	assert.equal(elements.some((element) => element.label === "Record delivery"), false);
+	assert.equal(elements.some((element) => element.label === "All delivery notes"), false);
+	assert.equal(elements.some((element) => element.label === "Saved time awaiting daily close"), false);
+}
+
+{
+	const { window, elements, overviewCalls, calls, messages } = await setup();
+	assert.equal(overviewCalls.at(-1).month, "2026-08");
+	window.working_time.open_time_booking_dialog = async (options) => {
+		await options.on_booked({ working_time: "WT-JULY" }, { date: "2026-07-14" });
+	};
+	await elements.find((element) => element.label === "Book time").handlers.click();
+	assert.deepEqual(overviewCalls.at(-1), { project: "TEST-PROJECT", month: "2026-07" },
+		"a saved entry for an earlier month must load that month so the entry is visible");
+	assert.equal(calls.length, 0, "refreshing a saved entry must not create another daily record");
+	assert.equal(messages.length, 0);
+}
+
+console.log("project.js runtime semantics: 7 scenarios passed");

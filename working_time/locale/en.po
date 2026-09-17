@@ -710,5 +710,48 @@ msgstr ""
 msgid "Review the signed Contract and Subscription before creating drafts: included Care time, minimum time per case and additional services require a deliberate billing decision. Rates come from the submitted Timesheet in company currency; missing rates are excluded."
 msgstr ""
 
+
+msgid "Recorded hours"
+msgstr "Recorded hours"
+
+msgid "{0} confirmed · {1} pending"
+msgstr "{0} confirmed · {1} pending"
+
+msgid "Saved time awaiting daily close"
+msgstr "Saved time awaiting daily close"
+
+msgid "These entries are saved, but not yet released for billing. Open the date to review the daily record."
+msgstr "These entries are saved, but not yet released for billing. Open the date to review the daily record."
+
+msgid "Open daily records"
+msgstr "Open daily records"
+
+msgid "Record delivery"
+msgstr "Record delivery"
+
+msgid "Deliveries in this month"
+msgstr "Deliveries in this month"
+
+msgid "Record items, quantities, warehouse and serial numbers in the delivery note. Invoice delivered items from that document."
+msgstr "Record items, quantities, warehouse and serial numbers in the delivery note. Invoice delivered items from that document."
+
+msgid "All delivery notes"
+msgstr "All delivery notes"
+
+msgid "Showing {0} of {1} entries."
+msgstr "Showing {0} of {1} entries."
+
+msgid "Confirmed time entries"
+msgstr "Confirmed time entries"
+
+msgid "SLA due today"
+msgstr "SLA due today"
+
+msgid "SLA due this week"
+msgstr "SLA due this week"
+
+msgid "SLA overdue"
+msgstr "SLA overdue"
+
 msgid "Close the whole workday: enter start, end and break, and allocate all net time. Book administration and acquisition to your internal Project. Review customer descriptions and mark included Care time as non-billable. Submission creates native Timesheets and Attendance; it does not invoice or send anything."
 msgstr ""

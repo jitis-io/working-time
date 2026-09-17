@@ -39,9 +39,9 @@
 			for (const [label, kind] of [
 				[__("Active work"), "active"],
 				[__("Assigned to me"), "mine"],
-				[__("Due today"), "today"],
-				[__("Due this week"), "week"],
-				[__("Overdue"), "overdue"],
+				[doctype === "Issue" ? __("SLA due today") : __("Due today"), "today"],
+				[doctype === "Issue" ? __("SLA due this week") : __("Due this week"), "week"],
+				[doctype === "Issue" ? __("SLA overdue") : __("Overdue"), "overdue"],
 			]) {
 				listview.page.add_inner_button(label, () => apply(kind), __("Work view"));
 			}

@@ -48,7 +48,9 @@ import frappe
 from working_time.project_overview import (
 	_aggregate_invoice_rows,
 	_aggregate_time_rows,
+	_delivery_note_rows,
 	_month_period,
+	_pending_time_rows,
 	_permitted_time_rows,
 	_purchase_invoice_item_rows,
 	_time_entry_rows,
@@ -62,6 +64,126 @@ class FakeDocument(types.SimpleNamespace):
 
 
 class TestProjectOverview(unittest.TestCase):
+	def test_pending_time_does_not_query_without_parent_read_permission(self):
+		with (
+			patch.object(frappe, "has_permission", return_value=False),
+			patch.object(frappe, "get_list") as parents,
+			patch.object(frappe.db, "sql") as sql,
+		):
+			self.assertEqual(_pending_time_rows("PROJ-A", _month_period("2026-09")), [])
+		parents.assert_not_called()
+		sql.assert_not_called()
+
+	def test_pending_time_limits_query_to_readable_parents_and_exact_customer_project(self):
+		def permission(doctype, action, doc=None):
+			return doc != "WT-HIDDEN"
+
+		with (
+			patch.object(frappe, "has_permission", side_effect=permission),
+			patch.object(
+				frappe, "get_list", return_value=[{"name": "WT-OWN"}, {"name": "WT-HIDDEN"}]
+			) as parents,
+			patch.object(frappe.db, "sql", return_value=[]) as sql,
+		):
+			_pending_time_rows("PROJ-A", _month_period("2026-09"))
+		self.assertEqual(
+			parents.call_args.kwargs["filters"],
+			{
+				"docstatus": 0,
+				"date": ["between", [date(2026, 9, 1), date(2026, 9, 30)]],
+			},
+		)
+		query, values = sql.call_args.args
+		self.assertEqual(values["parents"], ("WT-OWN",))
+		self.assertEqual(values["project"], "PROJ-A")
+		for condition in (
+			"wt.docstatus = 0",
+			"log.project = %(project)s",
+			"log.duration > 0",
+			"coalesce(log.is_break, 0) = 0",
+			"wt.date < %(next_start)s",
+		):
+			self.assertIn(condition, query)
+		self.assertNotIn("internal_note", query)
+		self.assertNotIn("billing_rate", query)
+
+	def test_pending_time_does_not_query_when_all_parents_are_denied(self):
+		with (
+			patch.object(frappe, "has_permission", side_effect=lambda doctype, action, doc=None: doc is None),
+			patch.object(frappe, "get_list", return_value=[{"name": "WT-HIDDEN"}]),
+			patch.object(frappe.db, "sql") as sql,
+		):
+			self.assertEqual(_pending_time_rows("PROJ-A", _month_period("2026-09")), [])
+		sql.assert_not_called()
+
+	def test_saved_time_is_visible_without_adding_to_confirmed_billing(self):
+		project = FakeDocument(name="PROJ-A", customer="CUST-A", company=None)
+		rows = [
+			{
+				"name": f"WTL-{index}",
+				"working_time": "WT-1",
+				"date": date(2026, 9, 17),
+				"hours": 0.25,
+				"description": "Support",
+			}
+			for index in range(10)
+		]
+		with (
+			patch.object(frappe, "get_doc", return_value=project),
+			patch.object(frappe, "has_permission", return_value=True),
+			patch.object(frappe, "get_list", return_value=[]),
+			patch("working_time.project_overview.is_system_manager", return_value=False),
+			patch("working_time.project_overview.get_user_employee", return_value="EMP-1"),
+			patch("working_time.project_overview._pending_time_rows", return_value=rows),
+			patch("working_time.project_overview._time_entry_rows", return_value=[]),
+		):
+			result = get_project_month("PROJ-A", "2026-09")
+		self.assertEqual(result["summary"]["pending_hours"], 2.5)
+		for field in ("hours", "billable_hours", "billable_amount", "unbilled_amount", "time_cost"):
+			self.assertEqual(result["summary"][field], 0)
+		self.assertEqual(result["counts"]["pending_time_entries"], 10)
+		self.assertEqual(len(result["rows"]["pending_time_entries"]), 8)
+		self.assertEqual(result["rows"]["pending_time_entries"][0]["date"], "2026-09-17")
+		json.dumps(result)
+
+	def test_deliveries_obey_customer_company_month_and_document_permissions(self):
+		project = FakeDocument(name="PROJ-A", customer="CUST-A", company="COMP-A")
+		with (
+			patch.object(
+				frappe, "has_permission", side_effect=lambda doctype, action, doc=None: doc != "DN-HIDDEN"
+			),
+			patch.object(
+				frappe, "get_list", return_value=[{"name": "DN-OWN"}, {"name": "DN-HIDDEN"}]
+			) as listing,
+		):
+			result = _delivery_note_rows(project, _month_period("2026-09"))
+		self.assertEqual(result, [{"name": "DN-OWN"}])
+		self.assertEqual(listing.call_args.args, ("Delivery Note",))
+		self.assertEqual(
+			listing.call_args.kwargs["filters"],
+			{
+				"project": "PROJ-A",
+				"customer": "CUST-A",
+				"company": "COMP-A",
+				"docstatus": ["in", [0, 1]],
+				"posting_date": ["between", [date(2026, 9, 1), date(2026, 9, 30)]],
+			},
+		)
+
+	def test_deliveries_do_not_query_without_customer_or_read_permission(self):
+		for customer, permitted in ((None, True), ("CUST-A", False)):
+			with (
+				patch.object(frappe, "has_permission", return_value=permitted),
+				patch.object(frappe, "get_list") as listing,
+			):
+				self.assertEqual(
+					_delivery_note_rows(
+						FakeDocument(name="PROJ-A", customer=customer), _month_period("2026-09")
+					),
+					[],
+				)
+			listing.assert_not_called()
+
 	def test_month_period_is_exactly_one_calendar_month(self):
 		period = _month_period("2024-02")
 

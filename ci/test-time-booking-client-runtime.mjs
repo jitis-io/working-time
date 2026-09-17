@@ -37,12 +37,14 @@ async function runScenario({
 	lostResponse = false,
 	doubleClick = false,
 	transactionConflict = false,
+	bookingDate = "2026-08-28",
 }) {
 	const events = [];
 	const alerts = [];
 	const messages = [];
 	const routes = [];
 	const bookingArgs = [];
+	const callbackArgs = [];
 	let dialog;
 
 	class Dialog {
@@ -50,7 +52,7 @@ async function runScenario({
 			this.configuration = configuration;
 			this.values = {
 				project: "P-1",
-				date: "2026-08-28",
+				date: bookingDate,
 				duration_minutes: 30,
 				billable: 0,
 				open_daily_close: openDailyClose ? 1 : 0,
@@ -147,7 +149,8 @@ async function runScenario({
 
 	const options = {};
 	if (callback !== "none") {
-		options.on_booked = async () => {
+		options.on_booked = async (...args) => {
+			callbackArgs.push(JSON.parse(JSON.stringify(args)));
 			events.push("callback:start");
 			if (callback === "reject") throw new Error("callback rejected");
 			events.push("callback:complete");
@@ -163,7 +166,7 @@ async function runScenario({
 	}
 	if (lostResponse || transactionConflict) await dialog.configuration.primary_action();
 
-	return { events, alerts, messages, routes, bookingArgs };
+	return { events, alerts, messages, routes, bookingArgs, callbackArgs };
 }
 
 function assertNoRedBookingError(result) {
@@ -266,4 +269,20 @@ function assertNoRedBookingError(result) {
 	assert.equal(result.alerts.filter((alert) => alert.indicator === "green").length, 1);
 }
 
-console.log("time_booking.js runtime semantics: 8 scenarios passed");
+{
+	const result = await runScenario({
+		bookingResult: { working_time: "WT-EARLIER-MONTH" },
+		callback: "resolve",
+		bookingDate: "2026-07-14",
+		openDailyClose: false,
+	});
+	assert.equal(result.bookingArgs[0].date, "2026-07-14");
+	assert.deepEqual(result.callbackArgs, [[
+		{ working_time: "WT-EARLIER-MONTH" }, { date: "2026-07-14" },
+	]], "the refresh callback must receive the saved date, not today's dialog context");
+	assert.equal(result.bookingArgs.length, 1);
+	assert.equal(result.routes.length, 0);
+	assertNoRedBookingError(result);
+}
+
+console.log("time_booking.js runtime semantics: 9 scenarios passed");

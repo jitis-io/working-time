@@ -1192,5 +1192,48 @@ msgstr "Für Zeitabrechnungsentwürfe muss der Kundenauftrag die Firmenwährung 
 msgid "Review the signed Contract and Subscription before creating drafts: included Care time, minimum time per case and additional services require a deliberate billing decision. Rates come from the submitted Timesheet in company currency; missing rates are excluded."
 msgstr "Vor Rechnungsentwürfen den unterschriebenen Vertrag und das Abonnement prüfen: enthaltene Care-Zeit, Mindestzeit je Vorgang und Mehrleistungen bewusst abrechnen. Es gelten die im eingereichten Stundenzettel gespeicherten Sätze in Firmenwährung; fehlende Sätze werden ausgeschlossen."
 
+
+msgid "Recorded hours"
+msgstr "Erfasste Stunden"
+
+msgid "{0} confirmed · {1} pending"
+msgstr "{0} bestätigt · {1} noch nicht freigegeben"
+
+msgid "Saved time awaiting daily close"
+msgstr "Gespeicherte Zeiten ohne Tagesabschluss"
+
+msgid "These entries are saved, but not yet released for billing. Open the date to review the daily record."
+msgstr "Diese Zeiten sind gespeichert, aber noch nicht zur Abrechnung freigegeben. Über das Datum öffnen Sie den Tag zur Prüfung."
+
+msgid "Open daily records"
+msgstr "Offene Tageserfassungen"
+
+msgid "Record delivery"
+msgstr "Materiallieferung erfassen"
+
+msgid "Deliveries in this month"
+msgstr "Lieferscheine dieses Monats"
+
+msgid "Record items, quantities, warehouse and serial numbers in the delivery note. Invoice delivered items from that document."
+msgstr "Artikel, Mengen, Lager und Seriennummern im Lieferschein erfassen. Gelieferte Artikel anschließend aus diesem Beleg abrechnen."
+
+msgid "All delivery notes"
+msgstr "Alle Lieferscheine"
+
+msgid "Showing {0} of {1} entries."
+msgstr "{0} von {1} Einträgen werden angezeigt."
+
+msgid "Confirmed time entries"
+msgstr "Bestätigte Zeiten"
+
+msgid "SLA due today"
+msgstr "SLA-Frist heute"
+
+msgid "SLA due this week"
+msgstr "SLA-Frist diese Woche"
+
+msgid "SLA overdue"
+msgstr "SLA-Frist überschritten"
+
 msgid "Close the whole workday: enter start, end and break, and allocate all net time. Book administration and acquisition to your internal Project. Review customer descriptions and mark included Care time as non-billable. Submission creates native Timesheets and Attendance; it does not invoice or send anything."
 msgstr "Den ganzen Arbeitstag abschließen: Beginn, Ende und Pause eintragen und die gesamte Nettozeit zuordnen. Verwaltung und Akquise auf das interne Projekt buchen. Kundentexte prüfen und enthaltene Care-Zeit als nicht abrechenbar markieren. Einreichen erzeugt Stundenzettel und Anwesenheit; es wird nichts in Rechnung gestellt oder versendet."
