@@ -164,7 +164,13 @@
 
 		render_toolbar(frm, header, data);
 		render_kpis(root, data);
-		render_time_table(root, rows.time_entries || [], project.currency);
+		if (Number(counts.pending_time_entries || 0) > 0) {
+			render_pending_time_table(root, rows.pending_time_entries || [], counts.pending_time_entries, data);
+		}
+		render_time_table(root, rows.time_entries || [], project.currency, counts.time_entries);
+		if (capabilities.can_view_deliveries && project.customer) {
+			render_delivery_table(root, rows.delivery_notes || [], counts.delivery_notes, data);
+		}
 		if (capabilities.can_view_purchases) {
 			render_invoice_table({
 				root,
@@ -212,7 +218,8 @@
 				}
 				await window.working_time.open_time_booking_dialog({
 					project: frm.doc.name,
-					on_booked: () => load_overview(frm, get_state(frm).month),
+					on_booked: (_result, booking) =>
+						load_overview(frm, booking?.date?.slice(0, 7) || get_state(frm).month),
 				});
 			}, true);
 			add_action(work_actions, __("Daily close"), () => open_daily_record());
@@ -225,6 +232,15 @@
 		if (can_create("Task")) {
 			add_action(create_actions, __("New task"), () =>
 				frappe.new_doc("Task", { project: frm.doc.name })
+			);
+		}
+		if (data.project?.customer && can_create("Delivery Note")) {
+			add_action(create_actions, __("Record delivery"), () =>
+				frappe.new_doc("Delivery Note", {
+					customer: data.project.customer,
+					company: data.project.company,
+					project: frm.doc.name,
+				})
 			);
 		}
 		if (data.capabilities?.can_view_purchases && can_create("Purchase Invoice")) {
@@ -340,9 +356,11 @@
 		const capabilities = data.capabilities || {};
 		const kpis = [
 			{
-				label: __("Hours"),
-				value: format_hours(summary.hours),
-				detail: __("{0} billable", [format_hours(summary.billable_hours)]),
+				label: __("Recorded hours"),
+				value: format_hours(Number(summary.hours || 0) + Number(summary.pending_hours || 0)),
+				detail: __("{0} confirmed · {1} pending", [
+					format_hours(summary.hours), format_hours(summary.pending_hours),
+				]),
 			},
 			{
 				label: __("Unbilled"),
@@ -383,8 +401,60 @@
 		}
 	}
 
-	function render_time_table(root, rows, currency) {
-		const section = create_section(root, __("Time entries"), rows.length);
+	function render_pending_time_table(root, rows, count, data) {
+		const section = create_section(root, __("Saved time awaiting daily close"), count);
+		$("<p class='text-muted small'></p>")
+			.text(__("These entries are saved, but not yet released for billing. Open the date to review the daily record."))
+			.appendTo(section);
+		const table = create_table(section, [__("Date"), __("Employee"), __("Reference"), __("Description"), __("Hours")]);
+		for (const row of rows) {
+			const tr = $("<tr></tr>").appendTo(table.find("tbody"));
+			append_cell(tr, record_link("Working Time", row.working_time, format_date(row.date)), "text-nowrap");
+			append_cell(tr, row.employee_name || row.employee || "");
+			const relation = $("<div class='wt-project-overview__relation'></div>");
+			if (row.task) relation.append(record_link("Task", row.task, row.task));
+			if (row.issue) relation.append(record_link("Issue", row.issue, row.issue));
+			append_cell(tr, relation);
+			append_cell(tr, plain_text(row.description) || "—", "wt-project-overview__description");
+			append_cell(tr, format_hours(row.hours), "text-right text-nowrap");
+		}
+		render_row_limit(section, rows.length, count);
+		add_action(section, __("Open daily records"), () =>
+			frappe.set_route("List", "Working Time", {
+				docstatus: 0, date: ["between", [data.period.start, data.period.end]],
+			})
+		);
+	}
+
+	function render_delivery_table(root, rows, count, data) {
+		const section = create_section(root, __("Deliveries in this month"), Number(count || 0));
+		$("<p class='text-muted small'></p>")
+			.text(__("Record items, quantities, warehouse and serial numbers in the delivery note. Invoice delivered items from that document."))
+			.appendTo(section);
+		add_action(section, __("All delivery notes"), () =>
+			frappe.set_route("List", "Delivery Note", { project: data.project.name, customer: data.project.customer })
+		);
+		if (!rows.length) return render_empty(section);
+		const table = create_table(section, [__("Date"), __("Document"), __("Status"), __("Billed")]);
+		for (const row of rows) {
+			const tr = $("<tr></tr>").appendTo(table.find("tbody"));
+			append_cell(tr, format_date(row.posting_date));
+			append_cell(tr, record_link("Delivery Note", row.name, row.name));
+			append_cell(tr, __(String(row.status || "Draft")));
+			append_cell(tr, row.docstatus === 1 && !row.is_return
+				? `${Number(row.per_billed || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
+				: "—", "text-right text-nowrap");
+		}
+		render_row_limit(section, rows.length, count);
+	}
+
+	function render_row_limit(section, shown, total) {
+		if (Number(total || 0) <= shown) return;
+		$("<p class='text-muted small mt-2'></p>").text(__("Showing {0} of {1} entries.", [shown, total])).appendTo(section);
+	}
+
+	function render_time_table(root, rows, currency, count) {
+		const section = create_section(root, __("Confirmed time entries"), Number(count ?? rows.length));
 		if (!rows.length) return render_empty(section);
 		const table = create_table(section, [
 			__("Date"),
@@ -419,6 +489,7 @@
 				);
 			}
 		}
+		render_row_limit(section, rows.length, count);
 	}
 
 	function render_invoice_table({

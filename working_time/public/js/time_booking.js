@@ -218,7 +218,7 @@
 					});
 					if (typeof options.on_booked === "function") {
 						try {
-							await options.on_booked(result || {});
+							await options.on_booked(result || {}, { date: values.date });
 						} catch {
 							frappe.show_alert({
 								message: __("Time was booked. Refresh the view to see it."),

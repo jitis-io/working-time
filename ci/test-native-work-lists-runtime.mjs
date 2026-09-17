@@ -49,11 +49,11 @@ for (const doctype of ["Task", "Issue"]) {
 	assert.deepEqual(filters.at(-1), [doctype, "_assign", "like", '%"person@example.invalid"%']);
 	const dueField = doctype === "Task" ? "exp_end_date" : "resolution_by";
 	const suffix = doctype === "Task" ? "" : " 00:00:00";
-	await buttons.get("Due today")();
+	await buttons.get(doctype === "Issue" ? "SLA due today" : "Due today")();
 	assert.deepEqual(filters.slice(-2), [[doctype, dueField, ">=", `2026-09-05${suffix}`], [doctype, dueField, "<", `2026-09-06${suffix}`]]);
-	await buttons.get("Due this week")();
+	await buttons.get(doctype === "Issue" ? "SLA due this week" : "Due this week")();
 	assert.deepEqual(filters.slice(-2), [[doctype, dueField, ">=", `2026-08-31${suffix}`], [doctype, dueField, "<", `2026-09-07${suffix}`]]);
-	await buttons.get("Overdue")();
+	await buttons.get(doctype === "Issue" ? "SLA overdue" : "Overdue")();
 	assert.deepEqual(filters.at(-1), [doctype, dueField, "<", `2026-09-05${suffix}`]);
 }
 console.log("Native work list filters preserve upstream actions and date/identity boundaries.");

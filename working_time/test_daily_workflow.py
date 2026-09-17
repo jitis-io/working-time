@@ -15,11 +15,18 @@ from working_time.platform_operations import (
 	create_billing_review,
 	create_project_time_invoice_draft,
 )
+from working_time.project_overview import get_project_month
 
 
 class TestDailyWorkflow(IntegrationTestCase):
 	def setUp(self):
 		super().setUp()
+		# Frappe v16 rolls back IntegrationTestCase data only after the whole class.
+		# Each scenario owns fresh fixtures on the same date, so its transaction
+		# must end before the next scenario performs an unfiltered billing review.
+		# Register first: explicit committed-fixture cleanup must run before this.
+		self.addCleanup(frappe.db.rollback)
+		self.addCleanup(frappe.db.value_cache.clear)
 		frappe.set_user("Administrator")
 		self.suffix = uuid.uuid4().hex[:8]
 		self.day = "2026-08-17"
@@ -149,8 +156,8 @@ class TestDailyWorkflow(IntegrationTestCase):
 			project=project or self.projects[0].name,
 			date=self.day,
 			duration_minutes=minutes,
-			customer_description="_Test verified service",
-			internal_note="_Test private note",
+			customer_description=kwargs.pop("customer_description", "_Test verified service"),
+			internal_note=kwargs.pop("internal_note", "_Test private note"),
 			billable=1,
 			**kwargs,
 		)
@@ -188,6 +195,23 @@ class TestDailyWorkflow(IntegrationTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "already submitted"):
 			self.book()
 		self.assertEqual(frappe.db.count("Working Time", {"employee": self.employee.name, "docstatus": 1}), 1)
+
+	def test_monthly_account_shows_only_project_drafts_then_confirmed_time_once(self):
+		first = self.book(minutes=30, customer_description="Visible service", internal_note="PRIVATE")
+		self.book(project=self.projects[1].name, minutes=15, customer_description="OTHER CUSTOMER")
+		before = get_project_month(self.projects[0].name, self.day[:7])
+		self.assertEqual(before["summary"]["pending_hours"], 0.5)
+		self.assertEqual(before["summary"]["hours"], 0)
+		self.assertEqual(before["summary"]["unbilled_amount"], 0)
+		self.assertEqual(before["counts"]["pending_time_entries"], 1)
+		self.assertNotIn("OTHER CUSTOMER", json.dumps(before, default=str))
+		self.assertNotIn("PRIVATE", json.dumps(before, default=str))
+		self.close(first, end="09:45:00")
+		after = get_project_month(self.projects[0].name, self.day[:7])
+		self.assertEqual(after["summary"]["pending_hours"], 0)
+		self.assertEqual(after["counts"]["pending_time_entries"], 0)
+		self.assertEqual(after["summary"]["hours"], 0.5)
+		self.assertEqual(after["summary"]["unbilled_amount"], 60)
 
 	def test_request_retry_saves_once_and_rejects_changed_payload(self):
 		key = str(uuid.uuid4())
@@ -411,6 +435,7 @@ class TestDailyWorkflow(IntegrationTestCase):
 		review = frappe.get_doc("Billing Review", preview["name"])
 		self.assertFalse(review.project)
 		self.assertEqual(review.status, "Preview")
+		self.assertEqual({row.timesheet for row in review.items}, {timesheet.name})
 		rows = {row.customer: row for row in review.items if row.status == "Eligible"}
 		self.assertEqual(set(rows), {customer.name for customer in self.customers})
 		self.assertEqual(frappe.utils.flt(rows[self.customers[0].name].hours, 2), 0.25)

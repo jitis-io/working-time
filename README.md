@@ -2,6 +2,11 @@
 
 Project-centred time capture and billing preparation for ERPNext v16.
 
+The current local workflow proposal and first overview improvements are documented in
+[Kundenarbeit in ERPNext](docs/service-workflow.md). They are not a production release.
+The evidence-based operating review, removal decisions and acceptance tests are in
+[ERPNext service workflow audit](docs/service-platform-audit.md).
+
 The technical app and Python package remain named `working_time` for upgrade compatibility. The app
 does not provide a second workplace or project-management model. ERPNext **Project** is the visible
 customer account and the single entry point for tickets, tasks, time, purchases and billing.
@@ -48,11 +53,21 @@ Open an ERPNext Project and select **Customer Account**. The tab contains:
 - submitted Purchase Invoice cost;
 - draft and submitted Sales Invoice value;
 - a compact list of time, purchase and sales entries;
+- saved Working Time draft lines, shown separately from confirmed Timesheets;
+- native Delivery Notes for the month, their status and billing percentage, plus
+  a link to all deliveries for the customer Project across months;
 - direct actions for time, day close, Issue, Task, Purchase Invoice, Sales Invoice and the confirmed time
   invoice draft.
 
 ERPNext's native **Costing** and **Connections** tabs remain available for lifetime totals and complete
 drill-down lists.
+
+**Recorded hours** includes confirmed time and saved draft durations. Drafts have no billing or
+cost value in this overview; **Unbilled** still uses only eligible submitted Timesheets.
+The draft section respects daily-record permissions and filters each line to the current Project.
+**Record delivery** opens the standard Delivery Note with Customer, Company and Project defaults.
+Record quantities, warehouses and serial/batch details there; this shortcut does not submit stock
+or create invoices. Licenses and recurring billing remain in native sales/subscription records.
 
 ## Setup
 
@@ -68,6 +83,17 @@ drill-down lists.
 
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
+
+## Upgrade to 1.8.6
+
+- Show saved, permitted Working Time draft lines in the customer Project month account,
+  separately from confirmed Timesheets and without billing or costing values.
+- After a retrospective booking, display the month of the recorded date.
+- Open native Delivery Notes from the customer account and show monthly delivery status;
+  the all-deliveries link includes older documents. This is not a complete unbilled backlog.
+- Label Issue deadline filters explicitly as SLA deadlines. Task planning dates are unchanged.
+- No DocType, migration, stock, invoice or time lifecycle change is included. Daily close
+  remains required; the operating review records the remaining model limitations.
 
 ## Upgrade to 1.8.5
 

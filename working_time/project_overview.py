@@ -111,6 +111,72 @@ def _time_entry_rows(project: str, period: Mapping[str, Any]) -> list[Any]:
 	)
 
 
+def _pending_time_rows(project: str, period: Mapping[str, Any]) -> list[Any]:
+	"""Show only this project's draft lines from readable daily records.
+
+	Use the parent's list and document permissions before querying its child table.
+	A day can contain several customers, so filter the child project again.
+	Draft durations are visibility only, never a source for billing or costing.
+	"""
+	if not frappe.has_permission("Working Time", "read"):
+		return []
+	parents = frappe.get_list(
+		"Working Time",
+		filters={"docstatus": 0, "date": ["between", [period["start"], period["end"]]]},
+		fields=["name"],
+		limit_page_length=0,
+	)
+	allowed = tuple(
+		_value(row, "name")
+		for row in parents
+		if frappe.has_permission("Working Time", "read", doc=_value(row, "name"))
+	)
+	if not allowed:
+		return []
+	return frappe.db.sql(
+		"""
+		select log.name, wt.name as working_time, wt.date,
+			wt.employee, wt.employee_name, log.issue, log.task,
+			log.customer_description as description, log.duration / 3600.0 as hours
+		from `tabWorking Time Log` log
+		inner join `tabWorking Time` wt on wt.name = log.parent
+		where wt.name in %(parents)s and wt.docstatus = 0
+			and log.parenttype = 'Working Time' and log.parentfield = 'time_logs'
+			and log.project = %(project)s and coalesce(log.is_break, 0) = 0
+			and log.duration > 0
+			and wt.date >= %(start)s and wt.date < %(next_start)s
+		order by wt.date desc, wt.name, log.idx
+		""",
+		{
+			"parents": allowed,
+			"project": project,
+			"start": period["start"],
+			"next_start": period["next_start"],
+		},
+		as_dict=True,
+	)
+
+
+def _delivery_note_rows(project: Any, period: Mapping[str, Any]) -> list[Any]:
+	"""Keep quantities and serial/batch selection in the native Delivery Note."""
+	if not project.get("customer") or not frappe.has_permission("Delivery Note", "read"):
+		return []
+	rows = frappe.get_list(
+		"Delivery Note",
+		filters={
+			"project": project.name,
+			"customer": project.get("customer"),
+			"company": project.get("company"),
+			"docstatus": ["in", [0, 1]],
+			"posting_date": ["between", [period["start"], period["end"]]],
+		},
+		fields=["name", "posting_date", "status", "docstatus", "is_return", "per_billed"],
+		order_by="posting_date desc, modified desc",
+		limit_page_length=0,
+	)
+	return [row for row in rows if frappe.has_permission("Delivery Note", "read", doc=_value(row, "name"))]
+
+
 def _purchase_invoice_item_rows(project: str, company: str, period: Mapping[str, Any]) -> list[Any]:
 	return frappe.db.sql(
 		"""
@@ -317,12 +383,14 @@ def get_project_month(project: str, month: str | None = None) -> dict[str, Any]:
 	can_view_time = system_manager or bool(frappe.has_permission("Timesheet", "read"))
 	can_view_purchases = bool(frappe.has_permission("Purchase Invoice", "read"))
 	can_view_sales = bool(frappe.has_permission("Sales Invoice", "read"))
+	can_view_deliveries = bool(frappe.has_permission("Delivery Note", "read"))
 	capabilities = {
 		"can_book_time": _project_accepts_time_booking(project_doc)
 		and bool(get_user_employee())
 		and bool(frappe.has_permission("Working Time", "create")),
 		"can_view_purchases": can_view_purchases,
 		"can_view_sales": can_view_sales,
+		"can_view_deliveries": can_view_deliveries,
 		"can_create_billing_review": system_manager
 		and bool(frappe.has_permission("Billing Review", "create")),
 	}
@@ -335,6 +403,21 @@ def get_project_month(project: str, month: str | None = None) -> dict[str, Any]:
 	time_summary, time_entries = _aggregate_time_rows(
 		time_rows, _claimed_billing_sources() if time_rows else {}
 	)
+	pending_entries = [
+		{
+			"name": _value(row, "name"),
+			"working_time": _value(row, "working_time"),
+			"date": _date_string(_value(row, "date")),
+			"employee": _value(row, "employee"),
+			"employee_name": _value(row, "employee_name"),
+			"issue": _value(row, "issue"),
+			"task": _value(row, "task"),
+			"description": str(_value(row, "description") or ""),
+			"hours": _number(_value(row, "hours")),
+		}
+		for row in _pending_time_rows(project_doc.name, period)
+	]
+	deliveries = _delivery_note_rows(project_doc, period) if can_view_deliveries and company else []
 	purchase_invoices: list[dict[str, Any]] = []
 	if can_view_purchases and company:
 		purchase_invoices = _permitted_invoice_rows(
@@ -388,18 +471,34 @@ def get_project_month(project: str, month: str | None = None) -> dict[str, Any]:
 		"capabilities": capabilities,
 		"summary": {
 			**time_summary,
+			"pending_hours": float(sum((_decimal(row["hours"]) for row in pending_entries), Decimal(0))),
 			"purchase_cost": float(purchase_cost),
 			"sales_invoiced": float(sales_invoiced),
 			"sales_draft": float(sales_draft),
 			"margin": float(sales_invoiced - purchase_cost - time_cost),
 		},
 		"counts": {
+			"pending_time_entries": len(pending_entries),
+			"time_entries": len(time_entries),
+			"delivery_notes": len(deliveries),
 			"open_issues": _visible_count("Issue", project_doc.name, OPEN_ISSUE_STATUSES),
 			"open_tasks": _visible_count("Task", project_doc.name, OPEN_TASK_STATUSES),
 			"purchase_invoices": len(purchase_invoices),
 			"sales_invoices": len(sales_invoices),
 		},
 		"rows": {
+			"pending_time_entries": pending_entries[:ROW_LIMIT],
+			"delivery_notes": [
+				{
+					"name": _value(row, "name"),
+					"posting_date": _date_string(_value(row, "posting_date")),
+					"status": _value(row, "status"),
+					"docstatus": int(_value(row, "docstatus") or 0),
+					"is_return": bool(_value(row, "is_return")),
+					"per_billed": _number(_value(row, "per_billed")),
+				}
+				for row in deliveries[:ROW_LIMIT]
+			],
 			"time_entries": time_entries[:ROW_LIMIT],
 			"purchase_invoices": purchase_invoices[:ROW_LIMIT],
 			"sales_invoices": sales_invoices[:ROW_LIMIT],
