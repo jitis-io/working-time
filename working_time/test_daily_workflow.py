@@ -294,7 +294,12 @@ class TestDailyWorkflow(IntegrationTestCase):
 		frappe.delete_doc("Project", self.internal.name)
 		frappe.delete_doc("Employee", self.employee.name)
 		frappe.db.set_single_value("Global Defaults", "default_company", self.previous_default_company)
+		# HRMS 16.19 adds account rows to shared Expense Claim Types when a
+		# Company is created. Remove only rows owned by this disposable Company;
+		# never delete shared types or suppress the normal Company link checks.
+		frappe.db.delete("Expense Claim Account", {"company": self.company.name})
 		frappe.delete_doc("Company", self.company.name)
+		self.assertFalse(frappe.db.exists("Company", self.company.name))
 		frappe.db.commit()
 
 	def test_server_rejects_cross_customer_and_wrong_task_project(self):
