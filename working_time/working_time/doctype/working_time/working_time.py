@@ -204,6 +204,16 @@ class WorkingTime(Document):
 				)
 			)
 
+	def before_submit(self):
+		# Re-read all tasks before writing Working Time, Attendance or any Timesheet.
+		# Keep their status stable until the native Timesheet submit has finished.
+		self._task_status_at_submission = {}
+		for task in sorted({log.task for log in self.time_logs if log.task}):
+			status = frappe.db.get_value("Task", task, "status", for_update=True)
+			if status == "Cancelled":
+				frappe.throw(_("Time cannot be booked to a cancelled task."))
+			self._task_status_at_submission[task] = status
+
 	def on_submit(self):
 		self.create_attendance()
 		self.create_timesheets()
@@ -258,6 +268,7 @@ class WorkingTime(Document):
 						"is_billable": int(billable_hours > 0),
 						"project": project,
 						"task": log.task,
+						"completed": int(self._task_status_at_submission.get(log.task) == "Completed"),
 						"issue": log.issue,
 						"activity_type": "Default",
 						"base_billing_rate": billing_rate,
