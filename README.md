@@ -76,13 +76,22 @@ or create invoices. Licenses and recurring billing remain in native sales/subscr
 3. Configure the hourly billing Item in **Working Time Settings**.
 4. On a customer Project enable **Bill Time** and enter the verified hourly rate when hours are chargeable.
 5. Maintain Activity Cost for each Employee when internal time cost is required.
-6. Select an explicitly internal Project for administration and acquisition. Day close requires start,
-   end, break and allocation of the complete net workday, including your own non-customer work.
+6. Select an explicitly internal Project for administration and acquisition when you want to capture it.
+   Day close requires start, end, break and allocation of the net interval you enter yourself.
+   The app does not verify a complete real workday or require a minimum daily duration.
+   Submitted daily records still prevent ordinary additions for that employee and date.
 7. Keep **Create Daily Drafts** disabled unless empty daily reminders are deliberately wanted. The
    default is disabled; migration does not override an existing operator choice or delete old drafts.
 
 The app keeps ERPNext's native records and permissions. Users without read access to Timesheets,
 Purchase Invoices or Sales Invoices do not receive those details from the Project month API.
+
+## Upgrade to 1.8.7
+
+- Pin the disposable integration site to Frappe 16.34.0, ERPNext 16.35.0 and HRMS 16.19.0
+  with exact source commits, matching the planned platform update.
+- Clarify that day close validates the interval entered by the operator, not a complete real day.
+- No business logic, data model or migration changes beyond 1.8.6.
 
 ## Upgrade to 1.8.6
 

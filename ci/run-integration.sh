@@ -9,9 +9,9 @@ readonly DB_HOST="${DB_HOST:-mariadb}"
 readonly DB_ROOT_USERNAME="${DB_ROOT_USERNAME:-root}"
 readonly DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-root}"
 readonly SITE_NAME="${SITE_NAME:-test_site}"
-readonly FRAPPE_COMMIT="5cba016e86b54b57f34a3864282b92300ef20fb0"
-readonly ERPNEXT_COMMIT="b24c9eba551905e256e336ff170a91a92d197a2f"
-readonly HRMS_COMMIT="519a078131f7f96f8313b405caa511a1229a98f9"
+readonly FRAPPE_COMMIT="c1f1e8ec3708750d7254f7f99d869ffb9886f19f"
+readonly ERPNEXT_COMMIT="12cd563fb9a79731f75ae2a45b1446a0a2dd9e74"
+readonly HRMS_COMMIT="7e0fba4bf11a63ac7b21a717610e235310815c1a"
 
 until mariadb-admin ping --host="$DB_HOST" --user=root --password="$DB_ROOT_PASSWORD" --silent; do
 	sleep 2
@@ -35,7 +35,7 @@ git -C "$APP_SOURCE_DIR" -c user.name='Disposable CI' -c user.email='ci@example.
 # Keep Bench's own Git operations outside the source checkout.
 cd /home/runner
 bench init \
-	--frappe-branch v16.32.0 \
+	--frappe-branch v16.34.0 \
 	--python "$(command -v python)" \
 	--skip-assets \
 	--skip-redis-config-generation \
@@ -44,9 +44,9 @@ bench init \
 cd "$BENCH_DIR"
 test "$(git -C apps/frappe rev-parse HEAD)" = "$FRAPPE_COMMIT"
 
-bench get-app --skip-assets --branch v16.33.0 erpnext https://github.com/frappe/erpnext.git
+bench get-app --skip-assets --branch v16.35.0 erpnext https://github.com/frappe/erpnext.git
 test "$(git -C apps/erpnext rev-parse HEAD)" = "$ERPNEXT_COMMIT"
-bench get-app --skip-assets --branch v16.17.0 hrms https://github.com/frappe/hrms.git
+bench get-app --skip-assets --branch v16.19.0 hrms https://github.com/frappe/hrms.git
 test "$(git -C apps/hrms rev-parse HEAD)" = "$HRMS_COMMIT"
 bench get-app --skip-assets --soft-link "$APP_SOURCE_DIR"
 bench setup requirements --dev
