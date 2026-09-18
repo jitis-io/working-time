@@ -213,6 +213,80 @@ class TestDailyWorkflow(IntegrationTestCase):
 		self.assertEqual(after["summary"]["hours"], 0.5)
 		self.assertEqual(after["summary"]["unbilled_amount"], 60)
 
+	def test_task_completed_after_booking_stays_completed_when_working_time_is_submitted(self):
+		first = self.book(task=self.task.name)
+		self.task.status = "Completed"
+		self.task.save()
+
+		doc = self.close(first)
+
+		self.assertEqual(frappe.db.get_value("Task", self.task.name, "status"), "Completed")
+		timesheet = frappe.get_doc("Timesheet", {"working_time": doc.name})
+		self.assertEqual(timesheet.docstatus, 1)
+		self.assertEqual(timesheet.time_logs[0].completed, 1)
+		self.assertEqual(timesheet.total_hours, 0.5)
+		self.assertEqual(timesheet.total_billable_hours, 0.5)
+
+	def test_every_row_preserves_completed_task_without_completing_an_open_task(self):
+		open_task = frappe.get_doc(
+			{
+				"doctype": "Task",
+				"subject": f"_Test WT Open Task {self.suffix}",
+				"project": self.projects[0].name,
+			}
+		).insert()
+		first = self.book(minutes=10, task=self.task.name)
+		self.book(minutes=15, task=self.task.name)
+		self.book(minutes=5, task=open_task.name)
+		self.task.status = "Completed"
+		self.task.save()
+
+		doc = self.close(first)
+
+		self.assertEqual(frappe.db.get_value("Task", self.task.name, "status"), "Completed")
+		self.assertEqual(frappe.db.get_value("Task", open_task.name, "status"), "Working")
+		timesheet = frappe.get_doc("Timesheet", {"working_time": doc.name})
+		self.assertEqual([row.completed for row in timesheet.time_logs], [1, 1, 0])
+		self.assertEqual(timesheet.total_hours, 0.5)
+		self.assertEqual(timesheet.total_billable_hours, 0.5)
+
+	def test_open_task_keeps_native_working_status_on_working_time_submission(self):
+		first = self.book(task=self.task.name)
+		self.assertEqual(self.task.status, "Open")
+
+		doc = self.close(first)
+
+		self.assertEqual(frappe.db.get_value("Task", self.task.name, "status"), "Working")
+		timesheet = frappe.get_doc("Timesheet", {"working_time": doc.name})
+		self.assertEqual(timesheet.time_logs[0].completed, 0)
+
+	def test_task_cancelled_after_booking_blocks_submission_before_any_transfer(self):
+		cancelled_task = frappe.get_doc(
+			{
+				"doctype": "Task",
+				"subject": f"_Test WT Later Cancelled Task {self.suffix}",
+				"project": self.projects[1].name,
+			}
+		).insert()
+		first = self.book(minutes=15, task=self.task.name)
+		self.book(project=self.projects[1].name, minutes=15, task=cancelled_task.name)
+		doc = frappe.get_doc("Working Time", first["working_time"])
+		doc.check_in, doc.check_out = "09:00:00", "09:30:00"
+		doc.save()
+		cancelled_task.status = "Cancelled"
+		cancelled_task.save()
+
+		with self.assertRaisesRegex(frappe.ValidationError, "cancelled task"):
+			doc.submit()
+
+		# Check without a rollback: even the first project's Timesheet and Attendance
+		# must not have been created before the later cancelled task was discovered.
+		self.assertEqual(frappe.db.get_value("Working Time", doc.name, "docstatus"), 0)
+		self.assertEqual(frappe.db.count("Timesheet", {"working_time": doc.name}), 0)
+		self.assertEqual(frappe.db.count("Attendance", {"working_time": doc.name}), 0)
+		self.assertEqual(frappe.db.get_value("Task", self.task.name, "status"), "Open")
+		self.assertEqual(frappe.db.get_value("Task", cancelled_task.name, "status"), "Cancelled")
+
 	def test_request_retry_saves_once_and_rejects_changed_payload(self):
 		key = str(uuid.uuid4())
 		first = self.book(booking_request_id=key)
